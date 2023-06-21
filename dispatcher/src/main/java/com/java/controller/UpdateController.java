@@ -66,7 +66,7 @@ public class UpdateController {
         setView(sendMessage);
     }
 
-    private void setView(SendMessage sendMessage) {
+    public void setView(SendMessage sendMessage) {
         telegramBot.sendAnswerMessage(sendMessage);
     }
 
@@ -74,7 +74,6 @@ public class UpdateController {
         updateProducer.produce(PHOTO_MESSAGE_UPDATE, update);
         setFileIsReceivedView(update);
     }
-
 
     private void processDocMessage(Update update) {
         updateProducer.produce(DOC_MESSAGE_UPDATE, update);

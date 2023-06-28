@@ -1,11 +1,15 @@
 package com.java.service.impl;
 
+import com.java.entity.AppDocument;
 import com.java.entity.AppUser;
 import com.java.entity.RawData;
+import com.java.exceptions.UploadFileException;
 import com.java.repository.AppUserRepository;
 import com.java.repository.RawDataRepository;
+import com.java.service.FileService;
 import com.java.service.MainService;
 import com.java.service.ProducerService;
+import com.java.service.enums.ServiceCommand;
 import lombok.extern.log4j.Log4j;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -14,7 +18,7 @@ import org.telegram.telegrambots.meta.api.objects.User;
 
 import static com.java.entity.enums.UserState.BASIC_STATE;
 import static com.java.entity.enums.UserState.WAIT_FOR_EMAIL_STATE;
-import static com.java.service.enums.ServiceCommands.*;
+import static com.java.service.enums.ServiceCommand.*;
 
 @Service
 @Log4j
@@ -24,10 +28,16 @@ public class MainServiceImpl implements MainService {
     private final ProducerService service;
     private final AppUserRepository appUserRepository;
 
-    public MainServiceImpl(RawDataRepository rawDataRepository, ProducerService service, AppUserRepository appUserRepository) {
+    private final FileService fileService;
+
+    public MainServiceImpl(RawDataRepository rawDataRepository,
+                           ProducerService service,
+                           AppUserRepository appUserRepository,
+                           FileService fileService) {
         this.rawDataRepository = rawDataRepository;
         this.service = service;
         this.appUserRepository = appUserRepository;
+        this.fileService = fileService;
     }
 
     @Override
@@ -38,7 +48,9 @@ public class MainServiceImpl implements MainService {
         var text = update.getMessage().getText();
         var output = "";
 
-        if (CANCEL.equals(text)) {
+        var serviceCommand = ServiceCommand.fromValue(text);
+
+        if (CANCEL.equals(serviceCommand)) {
             output = cancelProcess(appUser);
         } else if (BASIC_STATE.equals(userState)) {
             output = processServiceCommand(appUser, text);
@@ -62,10 +74,17 @@ public class MainServiceImpl implements MainService {
         if (isNotAllowedToSendContent(chatId, appUser)) {
             return;
         }
-
-        //TODO добавить сохранение документа
-        var answer = "Документ успешно загружен! Ссылка для скачивания http://test.ry/get-doc/777";
-        sendAnswer(answer, chatId);
+        try {
+            AppDocument doc = fileService.processDoc(update.getMessage());
+            //TODO добавить генерацию ссылки для скачивания документа
+            var answer = "Документ успешно загружен! "
+                    + " Ссылка для скачивания http://test.ry/get-doc/777";
+            sendAnswer(answer, chatId);
+        } catch (UploadFileException exp) {
+            log.error(exp);
+            String error = "К сожалению, загрузка файла не удалась. Повторите попытку позже";
+            sendAnswer(error, chatId);
+        }
     }
 
     @Override

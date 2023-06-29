@@ -1,6 +1,7 @@
 package com.java.service.impl;
 
 import com.java.entity.AppDocument;
+import com.java.entity.AppPhoto;
 import com.java.entity.AppUser;
 import com.java.entity.RawData;
 import com.java.exceptions.UploadFileException;
@@ -96,10 +97,16 @@ public class MainServiceImpl implements MainService {
         if (isNotAllowedToSendContent(chatId, appUser)) {
             return;
         }
-
-        //TODO добавить сохранение фото
-        var answer = "Фото успешно загружено! Ссылка для скачивания http://test.ry/get-photo/777";
-        sendAnswer(answer, chatId);
+        try {
+            //TODO добавить генерацию ссылки для скачивания фото
+            AppPhoto photo = fileService.processPhoto(update.getMessage());
+            var answer = "Фото успешно загружено! Ссылка для скачивания http://test.ry/get-photo/777";
+            sendAnswer(answer, chatId);
+        } catch (UploadFileException exp) {
+            log.error(exp);
+            String error = "К сожалению, загрузка фото не удалась. Повторите попытку позже";
+            sendAnswer(error, chatId);
+        }
     }
 
     private boolean isNotAllowedToSendContent(Long chatId, AppUser appUser) {
@@ -124,12 +131,13 @@ public class MainServiceImpl implements MainService {
     }
 
     private String processServiceCommand(AppUser appUser, String cmd) {
-        if (REGISTRATION.equals(cmd)) {
+        var serviceCommand = ServiceCommand.fromValue(cmd);
+        if (REGISTRATION.equals(serviceCommand)) {
             // TODO добавить регистрацию
             return "Временно недоступно";
-        } else if (HELP.equals(cmd)) {
+        } else if (HELP.equals(serviceCommand)) {
             return help();
-        } else if (START.equals(cmd)) {
+        } else if (START.equals(serviceCommand)) {
             return "Приветствую! Чтобы посмотреть список доступных команд введите /help";
         } else {
             return "Неизвестная команда! Чтобы посмотреть список доступных команд введите /help";

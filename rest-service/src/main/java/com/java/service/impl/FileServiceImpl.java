@@ -6,6 +6,7 @@ import com.java.entity.BinaryContent;
 import com.java.repository.AppDocumentRepository;
 import com.java.repository.AppPhotoRepository;
 import com.java.service.FileService;
+import com.java.utils.CryptoTool;
 import lombok.extern.log4j.Log4j;
 import org.apache.commons.io.FileUtils;
 import org.springframework.core.io.FileSystemResource;
@@ -22,22 +23,29 @@ public class FileServiceImpl implements FileService {
 
     private final AppPhotoRepository appPhotoRepository;
 
-    public FileServiceImpl(AppDocumentRepository appDocumentRepository, AppPhotoRepository appPhotoRepository) {
+    private final CryptoTool cryptoTool;
+
+    public FileServiceImpl(AppDocumentRepository appDocumentRepository, AppPhotoRepository appPhotoRepository, CryptoTool cryptoTool) {
         this.appDocumentRepository = appDocumentRepository;
         this.appPhotoRepository = appPhotoRepository;
+        this.cryptoTool = cryptoTool;
     }
 
     @Override
-    public AppDocument getDocument(String docId) {
-        //TODO добавить дешифрование хэш-строки
-        var id = Long.parseLong(docId);
+    public AppDocument getDocument(String hash) {
+        var id = cryptoTool.idOf(hash);
+        if (id == null) {
+            return null;
+        }
         return appDocumentRepository.findById(id).orElse(null);
     }
 
     @Override
-    public AppPhoto getPhoto(String photoId) {
-        //TODO добавить дешифрование хэш-строки
-        var id = Long.parseLong(photoId);
+    public AppPhoto getPhoto(String hash) {
+        var id = cryptoTool.idOf(hash);
+        if (id == null) {
+            return null;
+        }
         return appPhotoRepository.findById(id).orElse(null);
     }
 

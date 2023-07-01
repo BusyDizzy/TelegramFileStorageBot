@@ -35,7 +35,7 @@ public class MailSenderServiceImpl implements MailSenderService {
     }
 
     private String getActivationMailBody(String id) {
-        var msg = String.format("Для заверщения регистрации перейдите по ссылке:\n%s",
+        var msg = String.format("Для завершения регистрации перейдите по ссылке:\n %s",
                 activationServiceUri);
         return msg.replace("{id}", id);
     }

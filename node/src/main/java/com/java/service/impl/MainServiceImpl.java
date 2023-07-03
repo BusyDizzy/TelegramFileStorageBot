@@ -143,10 +143,13 @@ public class MainServiceImpl implements MainService {
             return help();
         } else if (START.equals(serviceCommand)) {
             return "Приветствую! Чтобы посмотреть список доступных команд введите /help";
+        } else if (MENU.equals(serviceCommand)) {
+            return ServiceCommand.getMenuText();
         } else {
             return "Неизвестная команда! Чтобы посмотреть список доступных команд введите /help";
         }
     }
+
 
     private String help() {
         return "Список доступных команд:\n"

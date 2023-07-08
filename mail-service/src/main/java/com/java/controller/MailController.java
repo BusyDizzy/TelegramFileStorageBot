@@ -20,7 +20,15 @@ public class MailController {
 
     @PostMapping("/send")
     public ResponseEntity<?> sendActivationMail(@RequestBody MailParams mailParams) {
-        mailSenderService.send(mailParams);
+        mailSenderService.sendActivationEmail(mailParams);
+        // TODO Check the returned values or set return void
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/send-data")
+    public ResponseEntity<?> sendMail(@RequestBody MailParams mailParams) {
+        mailSenderService.sendEmail(mailParams);
+        // TODO Check the returned values or set return void
         return ResponseEntity.ok().build();
     }
 }

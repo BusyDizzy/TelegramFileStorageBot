@@ -143,7 +143,7 @@ public class FileServiceImpl implements FileService {
             throw new UploadFileException(e);
         }
 
-        //TODO подумать над оптимизацией
+        // TODO подумать над оптимизацией
         try (InputStream is = urlObj.openStream()) {
             return is.readAllBytes();
         } catch (IOException e) {

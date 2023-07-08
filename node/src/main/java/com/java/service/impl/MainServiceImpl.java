@@ -7,13 +7,10 @@ import com.java.entity.RawData;
 import com.java.exceptions.UploadFileException;
 import com.java.repository.AppUserRepository;
 import com.java.repository.RawDataRepository;
-import com.java.service.AppUserService;
-import com.java.service.FileService;
-import com.java.service.MainService;
-import com.java.service.ProducerService;
+import com.java.service.*;
 import com.java.service.enums.LinkType;
 import com.java.service.enums.ServiceCommand;
-import lombok.extern.log4j.Log4j;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -26,7 +23,7 @@ import static com.java.entity.enums.UserState.WAIT_FOR_EMAIL_STATE;
 import static com.java.service.enums.ServiceCommand.*;
 
 @Service
-@Log4j
+@Slf4j
 public class MainServiceImpl implements MainService {
 
     private final RawDataRepository rawDataRepository;
@@ -35,15 +32,22 @@ public class MainServiceImpl implements MainService {
     private final FileService fileService;
     private final AppUserService appUserService;
 
+    private final JobService jobService;
+
+    private final OpenAIService openAIService;
+
     public MainServiceImpl(RawDataRepository rawDataRepository,
                            ProducerService service,
                            AppUserRepository appUserRepository,
-                           FileService fileService, AppUserService appUserService) {
+                           FileService fileService, AppUserService appUserService,
+                           JobService jobService, OpenAIService openAIService) {
         this.rawDataRepository = rawDataRepository;
         this.service = service;
         this.appUserRepository = appUserRepository;
         this.fileService = fileService;
         this.appUserService = appUserService;
+        this.jobService = jobService;
+        this.openAIService = openAIService;
     }
 
     @Override
@@ -87,7 +91,7 @@ public class MainServiceImpl implements MainService {
                     + " Ссылка для скачивания: " + link;
             sendAnswer(answer, chatId);
         } catch (UploadFileException exp) {
-            log.error(exp);
+            log.error(String.valueOf(exp));
             String error = "К сожалению, загрузка файла не удалась. Повторите попытку позже";
             sendAnswer(error, chatId);
         }
@@ -108,7 +112,7 @@ public class MainServiceImpl implements MainService {
             var answer = "Фото успешно загружено! Ссылка для скачивания: " + link;
             sendAnswer(answer, chatId);
         } catch (UploadFileException exp) {
-            log.error(exp);
+            log.error(String.valueOf(exp));
             String error = "К сожалению, загрузка фото не удалась. Повторите попытку позже";
             sendAnswer(error, chatId);
         }
@@ -142,19 +146,26 @@ public class MainServiceImpl implements MainService {
         } else if (HELP.equals(serviceCommand)) {
             return help();
         } else if (START.equals(serviceCommand)) {
-            return "Приветствую! Чтобы посмотреть список доступных команд введите /help";
+            return "Приветствую! Для того чтобы начать использовать бот, необходимо набрать: /registration " +
+                    "Чтобы посмотреть список доступных команд введите /help";
         } else if (MENU.equals(serviceCommand)) {
             return ServiceCommand.getMenuText();
+        } else if (SHOW_JOBS.equals(serviceCommand) && appUser.getIsActive()) {
+            return jobService.generateCoverLetters(appUser);
         } else {
-            return "Неизвестная команда! Чтобы посмотреть список доступных команд введите /help";
+//            return openAIService.chatGPTRequest(cmd);
+            return "Вы не зарегистрированы! Чтобы начать использование бота зарегистрируйтесь: /registration " +
+                    "Иначе вы ввели неизвестную команду! Чтобы посмотреть список доступных команд введите /help " +
+                    "или нажмите кнопку меню!";
         }
     }
 
 
     private String help() {
-        return "Список доступных команд:\n"
-                + "/cancel - отмена выполнения текущей команды;\n"
-                + "/registration - регистрация пользователя.";
+        return """
+                Список доступных команд:
+                /cancel - отмена выполнения текущей команды;
+                /registration - регистрация пользователя.""";
     }
 
     private String cancelProcess(AppUser appUser) {

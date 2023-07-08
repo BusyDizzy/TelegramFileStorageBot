@@ -5,7 +5,7 @@ import com.java.entity.AppUser;
 import com.java.repository.AppUserRepository;
 import com.java.service.AppUserService;
 import com.java.utils.CryptoTool;
-import lombok.extern.log4j.Log4j;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -18,13 +18,16 @@ import static com.java.entity.enums.UserState.BASIC_STATE;
 import static com.java.entity.enums.UserState.WAIT_FOR_EMAIL_STATE;
 
 @Service
-@Log4j
+@Slf4j
 public class AppUserServiceImpl implements AppUserService {
 
     private final AppUserRepository appUserRepository;
     private final CryptoTool cryptoTool;
     @Value("${service.mail.uri}")
-    private String mailServiceUri;
+    private String mailServiceActivationUri;
+
+    @Value("${service.mail.data-uri}")
+    private String mailServiceDataUri;
 
     public AppUserServiceImpl(AppUserRepository appUserRepository, CryptoTool cryptoTool) {
         this.appUserRepository = appUserRepository;
@@ -76,6 +79,7 @@ public class AppUserServiceImpl implements AppUserService {
         }
     }
 
+
     private ResponseEntity<String> sendRequestToMailService(String cryptoUserId, String email) {
         var restTemplate = new RestTemplate();
         var headers = new HttpHeaders();
@@ -85,7 +89,27 @@ public class AppUserServiceImpl implements AppUserService {
                 .emailTo(email)
                 .build();
         var request = new HttpEntity<>(mailParams, headers);
-        return restTemplate.exchange(mailServiceUri,
+        log.info("Формируем письмо для регистрации, на почту: {}", email);
+        return restTemplate.exchange(mailServiceActivationUri,
+                HttpMethod.POST,
+                request,
+                String.class
+        );
+    }
+
+    // TODO Возможно тут не к месту публичный метод
+    @Override
+    public ResponseEntity<String> sendUserData(AppUser appUser, String message) {
+        var restTemplate = new RestTemplate();
+        var headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        var mailParams = MailParams.builder()
+                .coverLetter(message)
+                .emailTo(appUser.getEmail())
+                .build();
+        var request = new HttpEntity<>(mailParams, headers);
+        log.info("Формируем письмо с данными на почту: {}", appUser.getEmail());
+        return restTemplate.exchange(mailServiceDataUri,
                 HttpMethod.POST,
                 request,
                 String.class

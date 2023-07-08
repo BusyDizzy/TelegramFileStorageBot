@@ -1,20 +1,25 @@
 package com.java.controller;
 
-import lombok.extern.log4j.Log4j;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramWebhookBot;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
+import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updates.SetWebhook;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
+import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import javax.annotation.PostConstruct;
+import java.util.ArrayList;
+import java.util.List;
 
 
 @Component
-@Log4j
+@Slf4j
 public class TelegramBot extends TelegramWebhookBot {
 
     @Value("${bot.name}")
@@ -30,7 +35,9 @@ public class TelegramBot extends TelegramWebhookBot {
 
     public TelegramBot(UpdateProcessor updateProcessor) {
         this.updateController = updateProcessor;
+
     }
+
 
     @PostConstruct
     public void init() {
@@ -40,8 +47,15 @@ public class TelegramBot extends TelegramWebhookBot {
                     .url(botUri)
                     .build();
             this.setWebhook(setWebhook);
+            List<BotCommand> menu = new ArrayList<>();
+            menu.add(new BotCommand("/start", "Welcome message"));
+            menu.add(new BotCommand("/registration", "Register to start"));
+            menu.add(new BotCommand("/show_jobs", "Show jobs in database"));
+            menu.add(new BotCommand("/help", "Info how to use this bot"));
+            menu.add(new BotCommand("/cancel", "Cancel your request"));
+            this.execute(new SetMyCommands(menu, new BotCommandScopeDefault(), null));
         } catch (TelegramApiException e) {
-            log.error(e);
+            log.error(String.valueOf(e));
         }
     }
 
@@ -60,7 +74,7 @@ public class TelegramBot extends TelegramWebhookBot {
             try {
                 execute(message);
             } catch (TelegramApiException e) {
-                log.error(e);
+                log.error(String.valueOf(e));
             }
         }
     }

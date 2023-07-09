@@ -6,4 +6,6 @@ public interface MailSenderService {
     void sendActivationEmail(MailParams mailParams);
 
     void sendEmail(MailParams mailParams);
+
+    void sendEmailWithMultipleCovers(MailParams mailParams);
 }

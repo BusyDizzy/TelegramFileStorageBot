@@ -6,13 +6,16 @@ import com.java.model.AssistantMessage;
 import com.java.model.MessageRole;
 import com.java.service.OpenAIService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
+import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @Slf4j
@@ -27,7 +30,10 @@ public class OpenAIServiceImpl implements OpenAIService {
     // Create a RestTemplate instance
     private final RestTemplate restTemplate;
 
-    private List<AssistantMessage> sessionMessages = new ArrayList<>();
+    @Autowired
+    private RetryTemplate retryTemplate;
+
+    private final List<AssistantMessage> sessionMessages = new ArrayList<>();
 
     public OpenAIServiceImpl(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
@@ -43,13 +49,16 @@ public class OpenAIServiceImpl implements OpenAIService {
     }
 
     @Override
-    public String chatGPTRequestMemoryLess(String message) {
-        // Create the stateless request body as a JSON string
-        String requestBody =
-                String.format("{\"model\":\"%s\",\"messages\":[{\"role\":\"user\",\"content\":\"%s\"}]}",
-                        model, message);
-        return sendMessageToChatGPT(requestBody);
+    public CompletableFuture<String> chatGPTRequestMemoryLess(String message) {
+        return CompletableFuture.supplyAsync(() -> {
+            // Create the stateless request body as a JSON string
+            String requestBody =
+                    String.format("{\"model\":\"%s\",\"messages\":[{\"role\":\"user\",\"content\":\"%s\"}]}",
+                            model, message);
+            return retryTemplate.execute(context -> sendMessageToChatGPT(requestBody));
+        });
     }
+
 
     private String sendMessageToChatGPT(String requestBody) {
         // Create headers with Content-Type and Authorization

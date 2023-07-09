@@ -7,12 +7,16 @@ import com.java.service.AppUserService;
 import com.java.utils.CryptoTool;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 import javax.mail.internet.AddressException;
 import javax.mail.internet.InternetAddress;
+import java.util.List;
 
 import static com.java.entity.enums.UserState.BASIC_STATE;
 import static com.java.entity.enums.UserState.WAIT_FOR_EMAIL_STATE;
@@ -23,15 +27,18 @@ public class AppUserServiceImpl implements AppUserService {
 
     private final AppUserRepository appUserRepository;
     private final CryptoTool cryptoTool;
+
+    private final RestTemplate restTemplate;
     @Value("${service.mail.uri}")
     private String mailServiceActivationUri;
 
     @Value("${service.mail.data-uri}")
     private String mailServiceDataUri;
 
-    public AppUserServiceImpl(AppUserRepository appUserRepository, CryptoTool cryptoTool) {
+    public AppUserServiceImpl(AppUserRepository appUserRepository, CryptoTool cryptoTool, RestTemplate restTemplate) {
         this.appUserRepository = appUserRepository;
         this.cryptoTool = cryptoTool;
+        this.restTemplate = restTemplate;
     }
 
 
@@ -79,7 +86,6 @@ public class AppUserServiceImpl implements AppUserService {
         }
     }
 
-
     private ResponseEntity<String> sendRequestToMailService(String cryptoUserId, String email) {
         var restTemplate = new RestTemplate();
         var headers = new HttpHeaders();
@@ -114,5 +120,45 @@ public class AppUserServiceImpl implements AppUserService {
                 request,
                 String.class
         );
+    }
+
+    public ResponseEntity<String> sendMultipleCoverLetters(AppUser appUser, List<String> coverLetterContents) {
+        var headers = new HttpHeaders();
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        for (int i = 0; i < coverLetterContents.size(); i++) {
+            String letterContent = coverLetterContents.get(i);
+            if (letterContent != null && !letterContent.isEmpty()) {
+                int finalI = i;
+                ByteArrayResource resource = new ByteArrayResource(letterContent.getBytes()) {
+                    @Override
+                    public String getFilename() {
+                        return "cover_letter_" + finalI + ".txt";
+                    }
+                };
+                body.add("coverLetterFiles", new HttpEntity<>(resource, getHeaderForResource(resource)));
+            } else {
+                log.warn("Cover letter " + i + " is null or empty");
+            }
+        }
+
+        body.add("emailTo", appUser.getEmail());
+
+        var request = new HttpEntity<>(body, headers);
+        log.info("Sending multiple cover letters via email to: {}", appUser.getEmail());
+
+        return restTemplate.exchange(mailServiceDataUri, HttpMethod.POST, request, String.class);
+    }
+
+    private HttpHeaders getHeaderForResource(ByteArrayResource resource) {
+        HttpHeaders pictureHeader = new HttpHeaders();
+        pictureHeader.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+        pictureHeader.setContentLength(resource.contentLength());
+        pictureHeader.setContentDisposition(ContentDisposition.builder("form-data")
+                .name("coverLetterFiles")
+                .filename(resource.getFilename())
+                .build());
+        return pictureHeader;
     }
 }

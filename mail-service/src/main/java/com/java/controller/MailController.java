@@ -3,10 +3,10 @@ package com.java.controller;
 import com.java.dto.MailParams;
 import com.java.service.MailSenderService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/mail")
@@ -25,10 +25,28 @@ public class MailController {
         return ResponseEntity.ok().build();
     }
 
-    @PostMapping("/send-data")
+    @PostMapping("/send-mail")
     public ResponseEntity<?> sendMail(@RequestBody MailParams mailParams) {
         mailSenderService.sendEmail(mailParams);
         // TODO Check the returned values or set return void
+        return ResponseEntity.ok().build();
+    }
+
+//    @PostMapping("/send-data")
+//    public ResponseEntity<?> sendMailWithMultipleCovers(@RequestBody MailParams mailParams) {
+//        mailSenderService.sendEmailWithMultipleCovers(mailParams);
+//        // TODO Check the returned values or set return void
+//        return ResponseEntity.ok().build();
+//    }
+
+    @PostMapping("/send-data")
+    public ResponseEntity<?> sendMailWithMultipleCovers(@RequestParam("emailTo") String emailTo,
+                                                        @RequestParam("coverLetterFiles") List<MultipartFile> coverLetterFiles) {
+        MailParams mailParams = MailParams.builder()
+                .emailTo(emailTo)
+                .coverLetterFiles(coverLetterFiles)
+                .build();
+        mailSenderService.sendEmailWithMultipleCovers(mailParams);
         return ResponseEntity.ok().build();
     }
 }

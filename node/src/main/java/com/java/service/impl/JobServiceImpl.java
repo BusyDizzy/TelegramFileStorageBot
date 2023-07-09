@@ -5,18 +5,25 @@ import com.java.entity.CurriculumVitae;
 import com.java.entity.JobListing;
 import com.java.repository.CurriculumVitaeRepository;
 import com.java.repository.JobListingRepository;
+import com.java.service.AppUserService;
 import com.java.service.JobService;
 import com.java.service.OpenAIService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 public class JobServiceImpl implements JobService {
 
+
+//    private final AsyncTaskExecutor taskExecutor;
     private final OpenAIService openAIService;
     private final JobListingRepository jobListingRepository;
 
@@ -33,37 +40,69 @@ public class JobServiceImpl implements JobService {
             "Provide at the beginning several reasons why you would like to work on this company, " +
             "and then why I am a good fit. Here goes my CV:";
 
-    private final AppUserServiceImpl appUserService;
+    private final AppUserService appUserService;
 
-    public JobServiceImpl(OpenAIServiceImpl openAIServiceImpl, JobListingRepository jobListingRepository, CurriculumVitaeRepository curriculumVitaeRepository, AppUserServiceImpl appUserService) {
+    public JobServiceImpl(OpenAIServiceImpl openAIServiceImpl,
+                          JobListingRepository jobListingRepository,
+                          CurriculumVitaeRepository curriculumVitaeRepository,
+                          AppUserService appUserService) {
         this.openAIService = openAIServiceImpl;
         this.jobListingRepository = jobListingRepository;
         this.curriculumVitaeRepository = curriculumVitaeRepository;
         this.appUserService = appUserService;
     }
 
-    public String generateCoverLetters(AppUser appUser) {
+    @Override
+    public String showJobs(AppUser appUser) {
         List<String> jobs = new ArrayList<>();
         jobs.add(String.format(EMAIL_PREFIX, appUser.getEmail()));
         List<JobListing> jobList = jobListingRepository.findAll();
-        CurriculumVitae curriculumVitae = curriculumVitaeRepository.getCVsWithJobExperiences(1L);
-        String coverLetter;
-        StringBuilder promptToGenerateCoverLetter = new StringBuilder();
-
         for (JobListing job : jobList) {
-            promptToGenerateCoverLetter.setLength(0);
-            buildPromptForChatGPTForCV(promptToGenerateCoverLetter, curriculumVitae);
-            buildPromptForChatGPTForJob(promptToGenerateCoverLetter, job);
-
-            coverLetter = generateCover(promptToGenerateCoverLetter.toString());
-            appUserService.sendUserData(appUser, coverLetter);
-
             String messageString = String.format("Company: %s, Job Title: %s,  \n",
                     job.getCompanyName(), job.getJobTitle());
             jobs.add(messageString);
         }
+        log.info("Job list prepared, generating cover letters");
+        // Generate Multiple Cover Letters
+        CompletableFuture<List<String>> listCompletableFuture = generateCoverLetters(appUser, jobList);
+
+        // If generated try to send them all in one email as attachments
+        try {
+            appUserService.sendMultipleCoverLetters(appUser, listCompletableFuture.get());
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
         return String.join("", jobs);
     }
+
+    @Override
+    public CompletableFuture<List<String>> generateCoverLetters(AppUser appUser, List<JobListing> jobList) {
+        CurriculumVitae curriculumVitae = curriculumVitaeRepository.getCVsWithJobExperiences(1L);
+        List<CompletableFuture<String>> coverLetterFutures = new ArrayList<>();
+
+        for (JobListing job : jobList) {
+            StringBuilder promptToGenerateCoverLetter = new StringBuilder();
+            buildPromptForChatGPTForCV(promptToGenerateCoverLetter, curriculumVitae);
+            buildPromptForChatGPTForJob(promptToGenerateCoverLetter, job);
+
+            CompletableFuture<String> coverLetterFuture = openAIService.
+                    chatGPTRequestMemoryLess(promptToGenerateCoverLetter.toString());
+
+
+            coverLetterFutures.add(coverLetterFuture);
+        }
+
+        // Join all the futures into a single CompletableFuture that completes when all cover letters are generated
+        log.info("Joining all generated cover letters");
+        // Join all the futures into a single CompletableFuture that completes when all cover letters are generated
+        CompletableFuture<Void> allFutures = CompletableFuture.allOf(coverLetterFutures.toArray(new CompletableFuture[0]));
+
+        // Convert CompletableFuture<Void> to CompletableFuture<List<String>>
+        return allFutures.thenApply(v -> coverLetterFutures.stream()
+                .map(CompletableFuture::join) // join each future (blocking operation, but they should all be completed already because of the `allOf`)
+                .collect(Collectors.toList()));
+    }
+
 
     private void buildPromptForChatGPTForCV(StringBuilder promptToGenerateCoverLetter,
                                             CurriculumVitae curriculumVitae) {
@@ -86,10 +125,6 @@ public class JobServiceImpl implements JobService {
                 .append(replaceSymbolsWithSpaces(job.getJobResponsibilities())).append(" ")
                 .append(replaceSymbolsWithSpaces(job.getJobQualifications())).append(" ")
                 .append(replaceSymbolsWithSpaces(job.getJobAdditionalSkills()));
-    }
-
-    private String generateCover(String requiredDetails) {
-        return openAIService.chatGPTRequestMemoryLess(requiredDetails);
     }
 
     public String replaceSymbolsWithSpaces(String text) {

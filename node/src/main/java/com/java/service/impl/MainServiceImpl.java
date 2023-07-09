@@ -34,20 +34,20 @@ public class MainServiceImpl implements MainService {
 
     private final JobService jobService;
 
-    private final OpenAIService openAIService;
+    private final OpenAIServiceImpl openAIServiceImpl;
 
     public MainServiceImpl(RawDataRepository rawDataRepository,
                            ProducerService service,
                            AppUserRepository appUserRepository,
                            FileService fileService, AppUserService appUserService,
-                           JobService jobService, OpenAIService openAIService) {
+                           JobService jobService, OpenAIServiceImpl openAIServiceImpl) {
         this.rawDataRepository = rawDataRepository;
         this.service = service;
         this.appUserRepository = appUserRepository;
         this.fileService = fileService;
         this.appUserService = appUserService;
         this.jobService = jobService;
-        this.openAIService = openAIService;
+        this.openAIServiceImpl = openAIServiceImpl;
     }
 
     @Override
@@ -153,7 +153,7 @@ public class MainServiceImpl implements MainService {
         } else if (SHOW_JOBS.equals(serviceCommand) && appUser.getIsActive()) {
             return jobService.generateCoverLetters(appUser);
         } else {
-//            return openAIService.chatGPTRequest(cmd);
+//            return openAIService.chatGPTRequestSessionBased(cmd);
             return "Вы не зарегистрированы! Чтобы начать использование бота зарегистрируйтесь: /registration " +
                     "Иначе вы ввели неизвестную команду! Чтобы посмотреть список доступных команд введите /help " +
                     "или нажмите кнопку меню!";

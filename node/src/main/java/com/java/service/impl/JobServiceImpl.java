@@ -35,8 +35,8 @@ public class JobServiceImpl implements JobService {
 
     private final AppUserServiceImpl appUserService;
 
-    public JobServiceImpl(OpenAIService openAIService, JobListingRepository jobListingRepository, CurriculumVitaeRepository curriculumVitaeRepository, AppUserServiceImpl appUserService) {
-        this.openAIService = openAIService;
+    public JobServiceImpl(OpenAIServiceImpl openAIServiceImpl, JobListingRepository jobListingRepository, CurriculumVitaeRepository curriculumVitaeRepository, AppUserServiceImpl appUserService) {
+        this.openAIService = openAIServiceImpl;
         this.jobListingRepository = jobListingRepository;
         this.curriculumVitaeRepository = curriculumVitaeRepository;
         this.appUserService = appUserService;
@@ -79,7 +79,7 @@ public class JobServiceImpl implements JobService {
 
     private void buildPromptForChatGPTForJob(StringBuilder jobDescription, JobListing job) {
         jobDescription
-                .append("Here is the job description").append(" ")
+                .append("Here is the job description: ").append(" ")
                 .append(replaceSymbolsWithSpaces(job.getCompanyName())).append(" ")
                 .append(replaceSymbolsWithSpaces(job.getJobTitle())).append(" ")
                 .append(replaceSymbolsWithSpaces(job.getCompanyDescription())).append(" ")
@@ -89,7 +89,7 @@ public class JobServiceImpl implements JobService {
     }
 
     private String generateCover(String requiredDetails) {
-        return openAIService.chatGPTRequest(requiredDetails);
+        return openAIService.chatGPTRequestMemoryLess(requiredDetails);
     }
 
     public String replaceSymbolsWithSpaces(String text) {

@@ -2,7 +2,7 @@ package com.java.service.impl;
 
 import com.java.service.ConsumerService;
 import com.java.service.MainService;
-import lombok.extern.log4j.Log4j;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -10,7 +10,7 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import static com.java.model.RabbitQueue.*;
 
 @Service
-@Log4j
+@Slf4j
 public class ConsumerServiceImpl implements ConsumerService {
 
     private final MainService service;

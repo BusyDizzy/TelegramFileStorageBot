@@ -10,7 +10,7 @@ import com.java.repository.BinaryContentRepository;
 import com.java.service.FileService;
 import com.java.service.enums.LinkType;
 import com.java.utils.CryptoTool;
-import lombok.extern.log4j.Log4j;
+import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -25,7 +25,7 @@ import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 
-@Log4j
+@Slf4j
 @Service
 public class FileServiceImpl implements FileService {
     @Value("${token}")

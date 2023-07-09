@@ -2,7 +2,7 @@ package com.java.controller;
 
 import com.java.service.UpdateProducer;
 import com.java.utils.MessageUtils;
-import lombok.extern.log4j.Log4j;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -10,7 +10,7 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import static com.java.model.RabbitQueue.*;
 
 @Component
-@Log4j
+@Slf4j
 public class UpdateProcessor {
 
     private TelegramBot telegramBot;

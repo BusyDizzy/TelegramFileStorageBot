@@ -1,7 +1,7 @@
 package com.java.controller;
 
 import com.java.service.FileService;
-import lombok.extern.log4j.Log4j;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
-@Log4j
+@Slf4j
 @RestController
 @RequestMapping("/file")
 public class FileController {
@@ -40,7 +40,7 @@ public class FileController {
             out.write(binaryContent.getFileAsArrayOfBytes());
             out.close();
         } catch (IOException e) {
-            log.error(e);
+            log.error(String.valueOf(e));
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
         }
     }
@@ -64,7 +64,7 @@ public class FileController {
             out.write(binaryContent.getFileAsArrayOfBytes());
             out.close();
         } catch (IOException e) {
-            log.error(e);
+            log.error(String.valueOf(e));
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
         }
     }

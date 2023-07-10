@@ -8,6 +8,6 @@ import org.springframework.data.repository.query.Param;
 
 public interface CurriculumVitaeRepository extends JpaRepository<CurriculumVitae, Long> {
     @EntityGraph(attributePaths = {"jobExperience"}, type = EntityGraph.EntityGraphType.LOAD)
-    @Query("SELECT cv FROM CurriculumVitae cv WHERE cv.id = :cvId")
-    CurriculumVitae getCVsWithJobExperiences(@Param("cvId") Long cvId);
+    @Query("SELECT cv FROM CurriculumVitae cv WHERE cv.appUser.id = :userId")
+    CurriculumVitae findByIdWithJobExperiences(@Param("userId") Long userId);
 }

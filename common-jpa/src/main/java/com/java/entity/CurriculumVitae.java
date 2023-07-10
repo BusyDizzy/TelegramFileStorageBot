@@ -63,5 +63,9 @@ public class CurriculumVitae {
 
     @OneToMany
     private List<JobExperience> jobExperience;
+
+    @ManyToOne
+    @JoinColumn(name = "app_user_id")
+    private AppUser appUser;
 }
 

@@ -18,6 +18,7 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
 
+import java.util.List;
 import java.util.Optional;
 
 import static com.java.entity.enums.UserState.BASIC_STATE;
@@ -35,6 +36,8 @@ public class MainServiceImpl implements MainService {
     private final AppUserService appUserService;
 
     private final JobService jobService;
+
+    private final Integer USER_JOB_MATCH_RATE = 70;
 
     private final OpenAIService openAIService;
 
@@ -154,6 +157,15 @@ public class MainServiceImpl implements MainService {
                     "Чтобы посмотреть список доступных команд введите /help";
         } else if (MENU.equals(serviceCommand)) {
             return ServiceCommand.getMenuText();
+        } else if (MATCH_JOBS.equals(serviceCommand)) {
+
+            List<JobListingDTO> filteredJobs = jobService.matchJobs(appUser, USER_JOB_MATCH_RATE);
+            if (filteredJobs.size() > 0) {
+                return String.format("Найдено %d вакансий, подходящих вам с заданным рейтингом %d",
+                        filteredJobs.size(), USER_JOB_MATCH_RATE);
+            } else {
+                return "Вообще ничего не подходит, попробуйте понизить планку...";
+            }
         } else if (SHOW_JOBS.equals(serviceCommand) && appUser.getIsActive()) {
             return jobService.showJobs(appUser);
         } else if (DOWNLOAD_JOBS.equals(serviceCommand)) {

@@ -6,6 +6,7 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import javax.persistence.*;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -32,4 +33,17 @@ public class AppUser {
     private Boolean isActive;
     @Enumerated(EnumType.STRING)
     private UserState state;
+
+    @OneToMany(mappedBy = "appUser", cascade = CascadeType.ALL)
+    private List<CurriculumVitae> curriculumVitaeList;
+
+    public void addCurriculumVitae(CurriculumVitae curriculumVitae) {
+        this.curriculumVitaeList.add(curriculumVitae);
+        curriculumVitae.setAppUser(this);
+    }
+
+    public void removeCurriculumVitae(CurriculumVitae curriculumVitae) {
+        this.curriculumVitaeList.remove(curriculumVitae);
+        curriculumVitae.setAppUser(null);
+    }
 }

@@ -59,6 +59,20 @@ public class OpenAIServiceImpl implements OpenAIService {
         });
     }
 
+    @Override
+    public Double chatGPTRequestMemoryLessSingle(String message) {
+        // Create the stateless request body as a JSON string
+        String requestBody =
+                String.format("{\"model\":\"%s\",\"messages\":[{\"role\":\"user\",\"content\":\"%s\"}]}",
+                        model, message);
+        Double jobRate = null;
+        try {
+            jobRate = Double.parseDouble(sendMessageToChatGPT(requestBody));
+        } catch (Exception e) {
+            log.error("ChatGPT returned not a value for some reason", e);
+        }
+        return jobRate;
+    }
 
     private String sendMessageToChatGPT(String requestBody) {
         // Create headers with Content-Type and Authorization

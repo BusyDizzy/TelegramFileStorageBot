@@ -17,6 +17,7 @@
         <module>common-utils</module>
         <module>mail-service</module>
         <module>chatgpt</module>
+        <module>jobs-fetcher</module>
     </modules>
 
     <properties>

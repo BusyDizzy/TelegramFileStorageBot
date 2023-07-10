@@ -1,5 +1,6 @@
 package com.java.service.impl;
 
+import com.java.DTO.JobListingDTO;
 import com.java.entity.AppDocument;
 import com.java.entity.AppPhoto;
 import com.java.entity.AppUser;
@@ -11,6 +12,7 @@ import com.java.service.*;
 import com.java.service.enums.LinkType;
 import com.java.service.enums.ServiceCommand;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -39,8 +41,10 @@ public class MainServiceImpl implements MainService {
     public MainServiceImpl(RawDataRepository rawDataRepository,
                            ProducerService service,
                            AppUserRepository appUserRepository,
-                           FileService fileService, AppUserService appUserService,
-                           JobService jobService, OpenAIService openAIService) {
+                           FileService fileService,
+                           AppUserService appUserService,
+                           JobService jobService,
+                           OpenAIService openAIService) {
         this.rawDataRepository = rawDataRepository;
         this.service = service;
         this.appUserRepository = appUserRepository;
@@ -152,6 +156,13 @@ public class MainServiceImpl implements MainService {
             return ServiceCommand.getMenuText();
         } else if (SHOW_JOBS.equals(serviceCommand) && appUser.getIsActive()) {
             return jobService.showJobs(appUser);
+        } else if (DOWNLOAD_JOBS.equals(serviceCommand)) {
+            ResponseEntity<JobListingDTO[]> response = jobService.collectJobs("Java%20Developer", "Singapore");
+            if (response.getStatusCode().name().equals("OK")) {
+                return "Новый список вакансий загружен и отфильтрован исходя из вашего резюме \n" +
+                        "Для просмотра вакансий и генерации резюме команда /match_jobs";
+            }
+            return "Что-то пошло не так...";
         } else {
 //            return openAIService.chatGPTRequestSessionBased(cmd);
             return "Вы не зарегистрированы! Чтобы начать использование бота зарегистрируйтесь: /registration " +

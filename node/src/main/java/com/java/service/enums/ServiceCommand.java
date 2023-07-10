@@ -7,6 +7,11 @@ public enum ServiceCommand {
     START("/start"),
 
     SHOW_JOBS("/show_jobs"),
+
+    DOWNLOAD_JOBS("/download_jobs"),
+
+    MATCH_JOBS("/match_jobs"),
+    GENERATE_AND_SEND("/generate_and_send"),
     MENU("/menu");
     private final String value;
 

@@ -1,5 +1,7 @@
 package com.java.service.impl;
 
+import com.java.DTO.JobListingDTO;
+import com.java.client.JobClient;
 import com.java.entity.AppUser;
 import com.java.entity.CurriculumVitae;
 import com.java.entity.JobListing;
@@ -9,11 +11,13 @@ import com.java.service.AppUserService;
 import com.java.service.JobService;
 import com.java.service.OpenAIService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
@@ -23,13 +27,13 @@ import java.util.stream.Collectors;
 public class JobServiceImpl implements JobService {
 
 
-//    private final AsyncTaskExecutor taskExecutor;
+    //    private final AsyncTaskExecutor taskExecutor;
     private final OpenAIService openAIService;
     private final JobListingRepository jobListingRepository;
 
     private final CurriculumVitaeRepository curriculumVitaeRepository;
 
-    private static final String EMAIL_PREFIX = "На вашу почту %s будут отправлены письма на следующие вакансии: \n";
+    private static final String EMAIL_PREFIX = "На вашу почту %s были отправлены письма на следующие вакансии: \n";
     private static final String PROMPT_MESSAGE = "Accumulate my CV first. " +
             "Than generate cover letter for the position below based on my CV. Do not pour water, " +
             "be specific, provide three bullet points at once, why I am suitable for this job, the fourth point" +
@@ -42,14 +46,25 @@ public class JobServiceImpl implements JobService {
 
     private final AppUserService appUserService;
 
+    private List<JobListingDTO> currentDownloadedJobsList;
+
+    private final JobClient jobClient;
+
     public JobServiceImpl(OpenAIServiceImpl openAIServiceImpl,
                           JobListingRepository jobListingRepository,
                           CurriculumVitaeRepository curriculumVitaeRepository,
-                          AppUserService appUserService) {
+                          AppUserService appUserService, JobClient jobClient) {
         this.openAIService = openAIServiceImpl;
         this.jobListingRepository = jobListingRepository;
         this.curriculumVitaeRepository = curriculumVitaeRepository;
         this.appUserService = appUserService;
+        this.jobClient = jobClient;
+    }
+
+    public ResponseEntity<JobListingDTO[]> collectJobs(String query, String location) {
+        ResponseEntity<JobListingDTO[]> responseEntity = jobClient.fetchJobs(query, location);
+        currentDownloadedJobsList = Arrays.asList(Objects.requireNonNull(responseEntity.getBody()));
+        return responseEntity;
     }
 
     @Override

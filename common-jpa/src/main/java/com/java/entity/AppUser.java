@@ -1,5 +1,6 @@
 package com.java.entity;
 
+import com.java.DTO.JobListingDTO;
 import com.java.entity.enums.UserState;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -37,6 +38,9 @@ public class AppUser {
     @OneToMany(mappedBy = "appUser", cascade = CascadeType.ALL)
     private List<CurriculumVitae> curriculumVitaeList;
 
+    @OneToMany(mappedBy = "appUser", cascade = CascadeType.ALL)
+    private List<JobListingDTO> jobListingDTOList;
+
     public void addCurriculumVitae(CurriculumVitae curriculumVitae) {
         this.curriculumVitaeList.add(curriculumVitae);
         curriculumVitae.setAppUser(this);
@@ -45,5 +49,15 @@ public class AppUser {
     public void removeCurriculumVitae(CurriculumVitae curriculumVitae) {
         this.curriculumVitaeList.remove(curriculumVitae);
         curriculumVitae.setAppUser(null);
+    }
+
+    public void addJobListingDTO(JobListingDTO jobListingDTO) {
+        this.jobListingDTOList.add(jobListingDTO);
+        jobListingDTO.setAppUser(this);
+    }
+
+    public void removeJobListingDTO(JobListingDTO jobListingDTO) {
+        this.jobListingDTOList.remove(jobListingDTO);
+        jobListingDTO.setAppUser(null);
     }
 }

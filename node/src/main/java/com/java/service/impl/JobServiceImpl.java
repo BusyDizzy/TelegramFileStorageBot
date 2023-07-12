@@ -5,6 +5,7 @@ import com.java.client.JobClient;
 import com.java.entity.AppUser;
 import com.java.entity.CurriculumVitae;
 import com.java.entity.JobListing;
+import com.java.entity.enums.JobMatchState;
 import com.java.repository.CurriculumVitaeRepository;
 import com.java.repository.JobListingDTORepository;
 import com.java.repository.JobListingRepository;
@@ -68,8 +69,8 @@ public class JobServiceImpl implements JobService {
         this.jobClient = jobClient;
     }
 
-    public ResponseEntity<JobListingDTO[]> collectJobs(String query, String location) {
-        ResponseEntity<JobListingDTO[]> responseEntity = jobClient.fetchJobs(query, location);
+    public ResponseEntity<JobListingDTO[]> collectJobs(AppUser appUser, String query, String location) {
+        ResponseEntity<JobListingDTO[]> responseEntity = jobClient.fetchJobs(appUser.getId(), query, location);
         currentDownloadedJobsList = Arrays.asList(Objects.requireNonNull(responseEntity.getBody()));
         return responseEntity;
     }
@@ -115,6 +116,40 @@ public class JobServiceImpl implements JobService {
             appUserService.sendMultipleCoverLetters(appUser, listCompletableFuture.get());
         } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
+        }
+        return String.join("", jobs);
+    }
+
+    public String showDownloadedJobs(AppUser appUser) {
+        List<String> jobs = new ArrayList<>();
+        List<JobListingDTO> jobList = jobListingDTORepository.findByUserId(appUser.getId());
+        if (jobList.size() > 0) {
+            for (JobListingDTO job : jobList) {
+                String answerForMatch = "No";
+                String answerForCover = "No";
+                if (job.getJobMatchState().equals(JobMatchState.NOT_EVALUATED)) {
+                    answerForMatch = "Not evaluated yet";
+                } else if (job.getJobMatchState().equals(JobMatchState.MATCH)) {
+                    answerForMatch = "It's a Match! ;)";
+                }
+                if (job.getIsCoverSend()) {
+                    answerForCover = "Yes";
+                }
+                String messageString = String.format(
+                        "Job Id: %d \n" +
+                                "Company: %s \n" +
+                                "Job Title: %s \n" +
+                                "Match: %s \n" +
+                                "Cover sent: %s \n" +
+                                "Link: %s \n",
+                        job.getId(),
+                        job.getCompanyName(),
+                        job.getJobTitle(),
+                        answerForMatch,
+                        answerForCover,
+                        job.getUrl());
+                jobs.add(messageString);
+            }
         }
         return String.join("", jobs);
     }

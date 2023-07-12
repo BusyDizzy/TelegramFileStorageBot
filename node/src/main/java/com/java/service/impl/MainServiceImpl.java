@@ -167,12 +167,13 @@ public class MainServiceImpl implements MainService {
                 return "Вообще ничего не подходит, попробуйте понизить планку...";
             }
         } else if (SHOW_JOBS.equals(serviceCommand) && appUser.getIsActive()) {
-            return jobService.showJobs(appUser);
+            return jobService.showDownloadedJobs(appUser);
         } else if (DOWNLOAD_JOBS.equals(serviceCommand)) {
-            ResponseEntity<JobListingDTO[]> response = jobService.collectJobs("Java%20Developer", "Singapore");
+            ResponseEntity<JobListingDTO[]> response = jobService.collectJobs(appUser, "Java%20Developer", "Singapore");
             if (response.getStatusCode().name().equals("OK")) {
-                return "Новый список вакансий загружен и отфильтрован исходя из вашего резюме \n" +
-                        "Для просмотра вакансий и генерации резюме команда /match_jobs";
+                return String.format("В базу загружено %d новых вакансий, для просмотра нажмите /show_jobs", response.getBody().length);
+//                return "Новый список вакансий загружен и отфильтрован исходя из вашего резюме \n" +
+//                        "Для просмотра вакансий и генерации резюме команда /match_jobs";
             }
             return "Что-то пошло не так...";
         } else {

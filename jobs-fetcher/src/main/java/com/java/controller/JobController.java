@@ -24,6 +24,7 @@ public class JobController {
 
     @PostMapping("/search")
     public List<JobListingDTO> searchJobs(@RequestBody JobRequestDTO jobRequestDTO) {
-        return jobFetcher.getJobListingsAndSave(jobRequestDTO.getQuery(), jobRequestDTO.getLocation());
+        return jobFetcher.getJobListingsAndSave(jobRequestDTO.getQuery(), jobRequestDTO.getLocation(),
+                jobRequestDTO.getAppUserId());
     }
 }

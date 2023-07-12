@@ -1,6 +1,7 @@
 package com.java.strategy.impl;
 
 import com.java.DTO.JobListingDTO;
+import com.java.entity.enums.JobMatchState;
 import com.java.strategy.Strategy;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.HttpStatusException;
@@ -38,7 +39,7 @@ public class LinkedInStrategyImpl implements Strategy {
     }
 
     @Override
-    public List<JobListingDTO> getVacancies(String query, String location) {
+    public List<JobListingDTO> getVacancies(String query, String location, Long appUserId) {
         List<JobListingDTO> jobListings = new ArrayList<>();
         final int MAX_RETRY = 3; // Maximum number of retries
         final int DELAY_BETWEEN_REQUESTS = 5000; // Delay between requests in milliseconds
@@ -109,7 +110,8 @@ public class LinkedInStrategyImpl implements Strategy {
                 Element jobDescriptionElement = jobDocument.select("div.description__text").first();
                 String jobDescription = jobDescriptionElement != null ? jobDescriptionElement.text() : "Job description not available";
 
-                JobListingDTO jobListing = new JobListingDTO(null, jobId, jobTitle, companyName, jobDescription, jobUrl);
+                JobListingDTO jobListing = new JobListingDTO(null, jobId, jobTitle, companyName, jobDescription,
+                        jobUrl, JobMatchState.NOT_EVALUATED, false, appUserId);
                 log.info("New job listing is added with job id {} for company: {}", jobId, companyName);
                 jobListings.add(jobListing);
 
@@ -132,11 +134,10 @@ public class LinkedInStrategyImpl implements Strategy {
 
     protected Document getDocument(String searchString, String location, int start) throws IOException {
         String url = String.format(URL_FORMAT, searchString, location, start);
-        Document doc = Jsoup.connect(url)
+        return Jsoup.connect(url)
                 .userAgent(getRandomUserAgent())
                 .referrer("http://www.google.com")
                 .get();
-        return doc;
     }
 }
 

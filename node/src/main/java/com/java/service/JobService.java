@@ -14,7 +14,9 @@ public interface JobService {
     String showJobs(AppUser appUser);
 
     //    boolean collectJobs(String query, String location);
-    ResponseEntity<JobListingDTO[]> collectJobs(String query, String location);
+    ResponseEntity<JobListingDTO[]> collectJobs(AppUser appUser, String query, String location);
 
     List<JobListingDTO> matchJobs(AppUser appUser, int matchPercentage);
+
+    public String showDownloadedJobs(AppUser appUser);
 }

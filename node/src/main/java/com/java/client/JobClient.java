@@ -20,16 +20,14 @@ public class JobClient {
     }
 
 
-    public ResponseEntity<JobListingDTO[]> fetchJobs(String query, String location) {
+    public ResponseEntity<JobListingDTO[]> fetchJobs(Long appUserId, String query, String location) {
         JobRequestDTO jobRequest = new JobRequestDTO();
         jobRequest.setQuery(query);
         jobRequest.setLocation(location);
+        jobRequest.setAppUserId(appUserId);
 
         HttpEntity<JobRequestDTO> requestEntity = new HttpEntity<>(jobRequest);
         return restTemplate
                 .exchange(baseUrl, HttpMethod.POST, requestEntity, JobListingDTO[].class);
-
-//        return Arrays.asList(Objects.requireNonNull(responseEntity.getBody()));
-//        return responseEntity.;
     }
 }

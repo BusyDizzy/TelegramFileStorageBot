@@ -7,5 +7,5 @@ import com.java.DTO.JobListingDTO;
 import java.util.List;
 
 public interface Strategy {
-    List<JobListingDTO> getVacancies(String query, String location);
+    List<JobListingDTO> getVacancies(String query, String location, Long appUserId);
 }

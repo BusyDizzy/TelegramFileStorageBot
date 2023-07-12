@@ -10,4 +10,5 @@ import lombok.*;
 public class JobRequestDTO {
     private String query;
     private String location;
+    private Long appUserId;
 }

@@ -1,0 +1,9 @@
+bot:
+  name: MySpringChatGPTBot
+  token: 6234063857:AAGVIVwWLnotQOrl0C6n68t5ZQ4oAzQoJz8
+  text:
+    model: gpt-3.5-turbo
+api:
+  token: Bearer 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
+  url:
+    completions: https://api.openai.com/v1/chat/completions

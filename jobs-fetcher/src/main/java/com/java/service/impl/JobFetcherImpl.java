@@ -24,10 +24,10 @@ public class JobFetcherImpl implements JobFetcher {
     }
 
     @Override
-    public List<JobListingDTO> getJobListingsAndSave(String query, String location) {
+    public List<JobListingDTO> getJobListingsAndSave(String query, String location, Long appUserId) {
         List<JobListingDTO> allJobListings = new ArrayList<>();
         for (Strategy strategy : strategies.values()) {
-            List<JobListingDTO> jobListings = strategy.getVacancies(query, location);
+            List<JobListingDTO> jobListings = strategy.getVacancies(query, location, appUserId);
             allJobListings.addAll(jobListings);
             // Removing old entries based on website job Id
             removeExistingEntries(jobListings);

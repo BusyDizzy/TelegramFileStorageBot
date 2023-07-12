@@ -50,11 +50,11 @@ public class TelegramBot extends TelegramWebhookBot {
             List<BotCommand> menu = new ArrayList<>();
             menu.add(new BotCommand("/start", "Welcome message"));
             menu.add(new BotCommand("/registration", "Register to start"));
-            menu.add(new BotCommand("/download_jobs", "Downloads jobs from LinkedIn(now)"));
+            menu.add(new BotCommand("/download", "Downloads jobs from LinkedIn(now)"));
             menu.add(new BotCommand("/show_downloaded", "Show all jobs in database"));
             menu.add(new BotCommand("/match", "Matches you CV to jobs in database with defined rate"));
             menu.add(new BotCommand("/show_matched", "Shows jobs jobs that match you CV"));
-            menu.add(new BotCommand("/generate_and_send", "Generate covers for matched jobs and sends by email"));
+            menu.add(new BotCommand("/generate", "Generate covers for matched jobs and sends by email"));
             menu.add(new BotCommand("/help", "Info how to use this bot"));
             menu.add(new BotCommand("/cancel", "Cancel your request"));
             this.execute(new SetMyCommands(menu, new BotCommandScopeDefault(), null));

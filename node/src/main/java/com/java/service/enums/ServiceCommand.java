@@ -6,7 +6,7 @@ public enum ServiceCommand {
 
     REGISTRATION("/registration"),
 
-    DOWNLOAD_JOBS("/download_jobs"),
+    DOWNLOAD_JOBS("/download"),
 
     SHOW_DOWNLOADED("/show_downloaded"),
 
@@ -14,7 +14,7 @@ public enum ServiceCommand {
 
     SHOW_MATCHED("/show_matched"),
 
-    GENERATE_AND_SEND("/generate_and_send"),
+    GENERATE_AND_SEND("/generate"),
     HELP("/help"),
     CANCEL("/cancel"),
 

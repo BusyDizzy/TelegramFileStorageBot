@@ -30,7 +30,7 @@ public class OpenAIServiceImpl implements OpenAIService {
     // Create a RestTemplate instance
     private final RestTemplate restTemplate;
 
-    private final Integer DELAY_BETWEEN_REQUESTS = 1000;
+    private final Integer DELAY_BETWEEN_REQUESTS = 2000;
 
     @Autowired
     private RetryTemplate retryTemplate;

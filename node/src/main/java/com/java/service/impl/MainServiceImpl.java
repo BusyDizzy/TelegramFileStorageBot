@@ -38,6 +38,8 @@ public class MainServiceImpl implements MainService {
 
     private final JobService jobService;
 
+    private static final int CHUNK_SIZE = 4095;
+
     private final Integer USER_JOB_MATCH_RATE = 70;
 
     private final OpenAIService openAIService;
@@ -140,11 +142,31 @@ public class MainServiceImpl implements MainService {
         return false;
     }
 
+    //    private void sendAnswer(String output, Long chatId) {
+//        SendMessage sendMessage = new SendMessage();
+//        sendMessage.setChatId(chatId);
+//        sendMessage.setText(output);
+//
+//        service.produceAnswer(sendMessage);
+//    }
     private void sendAnswer(String output, Long chatId) {
-        SendMessage sendMessage = new SendMessage();
-        sendMessage.setChatId(chatId);
-        sendMessage.setText(output);
-        service.produceAnswer(sendMessage);
+        int length = output.length();
+
+        for (int i = 0; i < length; i += CHUNK_SIZE) {
+            // Determine end index for substring
+            int endIndex = Math.min(i + CHUNK_SIZE, length);
+
+            // Get the chunk
+            String chunk = output.substring(i, endIndex);
+
+            // Create message with chunk and chatId
+            SendMessage sendMessage = new SendMessage();
+            sendMessage.setChatId(chatId);
+            sendMessage.setText(chunk);
+
+            // Send to the service
+            service.produceAnswer(sendMessage);
+        }
     }
 
     private String processServiceCommand(AppUser appUser, String cmd) {

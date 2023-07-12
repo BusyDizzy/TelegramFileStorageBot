@@ -80,7 +80,7 @@ public class JobServiceImpl implements JobService {
         double userMatchValue = matchPercentage / 100.0;
         List<JobListingDTO> filteredJobs = new ArrayList<>(jobListingDTOS);
         log.info("Начинаем анализ {} вакансий с заданным порогом совпадения {} %", jobListingDTOS.size(), matchPercentage);
-        // TODO Pfменить на новый репозиторий как будет
+        // TODO Заменить на новый репозиторий как будет
         CurriculumVitae curriculumVitae = curriculumVitaeRepository.findByIdWithJobExperiences(appUser.getId());
         for (JobListingDTO job : jobListingDTOS) {
             StringBuilder promptToCalculateJobMatchingRate = new StringBuilder();
@@ -91,7 +91,12 @@ public class JobServiceImpl implements JobService {
             Double jobMatchValue = openAIService.
                     chatGPTRequestMemoryLessSingle(promptToCalculateJobMatchingRate.toString());
             if (jobMatchValue <= userMatchValue) {
+                job.setJobMatchState(JobMatchState.NOT_MATCH);
+                jobListingDTORepository.save(job);
                 filteredJobs.remove(job);
+            } else {
+                job.setJobMatchState(JobMatchState.MATCH);
+                jobListingDTORepository.save(job);
             }
         }
         log.info("Подобрано {} вакансий с заданным порогом совпадения {} %", filteredJobs.size(), matchPercentage);
@@ -102,9 +107,9 @@ public class JobServiceImpl implements JobService {
     public String generateCoversAndSendAsAttachment(AppUser appUser) {
         List<String> jobs = new ArrayList<>();
         jobs.add(String.format(EMAIL_PREFIX, appUser.getEmail()));
-        List<JobListing> jobList = jobListingRepository.findAll();
+        List<JobListingDTO> jobList = jobListingDTORepository.findByUserIdMatched(appUser.getId(), JobMatchState.MATCH);
 
-        for (JobListing job : jobList) {
+        for (JobListingDTO job : jobList) {
             String messageString = String.format("Company: %s, Job Title: %s,  \n",
                     job.getCompanyName(), job.getJobTitle());
             jobs.add(messageString);
@@ -166,20 +171,21 @@ public class JobServiceImpl implements JobService {
     }
 
 
-    private CompletableFuture<List<String>> generateCoverLetters(AppUser appUser, List<JobListing> jobList) {
+    private CompletableFuture<List<String>> generateCoverLetters(AppUser appUser, List<JobListingDTO> jobList) {
         CurriculumVitae curriculumVitae = curriculumVitaeRepository.findByIdWithJobExperiences(appUser.getId());
         List<CompletableFuture<String>> coverLetterFutures = new ArrayList<>();
 
-        for (JobListing job : jobList) {
+        for (JobListingDTO job : jobList) {
             StringBuilder promptToGenerateCoverLetter = new StringBuilder();
             buildPromptForChatGPTForUserData(promptToGenerateCoverLetter,
                     PROMPT_MESSAGE_FOR_COVER_GENERATION,
                     curriculumVitae);
-            buildPromptForChatGPTForJobListing(promptToGenerateCoverLetter, job);
+            buildPromptForChatGPTForJobListingDTO(promptToGenerateCoverLetter, job);
 
             CompletableFuture<String> coverLetterFuture = openAIService.
                     chatGPTRequestMemoryLess(promptToGenerateCoverLetter.toString());
-
+            job.setIsCoverSend(true);
+            jobListingDTORepository.save(job);
 
             coverLetterFutures.add(coverLetterFuture);
         }

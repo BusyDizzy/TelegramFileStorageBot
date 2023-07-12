@@ -30,6 +30,8 @@ public class OpenAIServiceImpl implements OpenAIService {
     // Create a RestTemplate instance
     private final RestTemplate restTemplate;
 
+    private final Integer DELAY_BETWEEN_REQUESTS = 1000;
+
     @Autowired
     private RetryTemplate retryTemplate;
 
@@ -68,6 +70,7 @@ public class OpenAIServiceImpl implements OpenAIService {
         Double jobRate = null;
         try {
             jobRate = Double.parseDouble(sendMessageToChatGPT(requestBody));
+            Thread.sleep(DELAY_BETWEEN_REQUESTS);
         } catch (Exception e) {
             log.error("ChatGPT returned not a value for some reason", e);
         }

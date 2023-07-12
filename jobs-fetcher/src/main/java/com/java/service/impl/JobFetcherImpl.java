@@ -30,7 +30,7 @@ public class JobFetcherImpl implements JobFetcher {
             List<JobListingDTO> jobListings = strategy.getVacancies(query, location, appUserId);
             allJobListings.addAll(jobListings);
             // Removing old entries based on website job Id
-            removeExistingEntries(jobListings);
+            removeExistingEntries(jobListings, appUserId);
             // save jobListings to database
             jobRepository.saveAll(jobListings);
         }
@@ -38,8 +38,8 @@ public class JobFetcherImpl implements JobFetcher {
     }
 
     // TODO Проверить работу
-    private void removeExistingEntries(List<JobListingDTO> jobListingDTOS) {
-        List<JobListingDTO> databaseEntries = jobRepository.findAll();
+    private void removeExistingEntries(List<JobListingDTO> jobListingDTOS, Long appUserId) {
+        List<JobListingDTO> databaseEntries = jobRepository.findByUserId(appUserId);
         int counter = 0;
         for (JobListingDTO dbJob : databaseEntries) {
             if (jobListingDTOS.contains(dbJob)) {

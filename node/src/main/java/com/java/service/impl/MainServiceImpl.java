@@ -19,6 +19,7 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import static com.java.entity.enums.UserState.BASIC_STATE;
@@ -152,31 +153,35 @@ public class MainServiceImpl implements MainService {
             return appUserService.registerUser(appUser);
         } else if (HELP.equals(serviceCommand)) {
             return help();
+
         } else if (START.equals(serviceCommand)) {
             return "Приветствую! Для того чтобы начать использовать бот, необходимо набрать: /registration " +
                     "Чтобы посмотреть список доступных команд введите /help";
-        } else if (MENU.equals(serviceCommand)) {
-            return ServiceCommand.getMenuText();
-        } else if (MATCH_JOBS.equals(serviceCommand)) {
-
+        } else if (DOWNLOAD_JOBS.equals(serviceCommand) && appUser.getIsActive()) {
+            ResponseEntity<JobListingDTO[]> response = jobService.collectJobs(
+                    appUser, "Java%20Developer", "Singapore");
+            if (response.getStatusCode().name().equals("OK")) {
+                return String.format("В базу загружено %d новых вакансий, " +
+                        "для просмотра нажмите /show_downloaded", Objects.requireNonNull(response.getBody()).length);
+            }
+            return "Что-то пошло не так...";
+        } else if (SHOW_DOWNLOADED.equals(serviceCommand) && appUser.getIsActive()) {
+            return jobService.showDownloadedJobs(appUser);
+        } else if (MATCH.equals(serviceCommand)) {
             List<JobListingDTO> filteredJobs = jobService.matchJobs(appUser, USER_JOB_MATCH_RATE);
             if (filteredJobs.size() > 0) {
-                return String.format("Найдено %d вакансий, подходящих вам с заданным рейтингом %d",
+                return String.format("Отфильтровано %d вакансий, подходящих вам с заданным рейтингом %d" +
+                                " Нажмите /show_matched для просмотра результатов.",
                         filteredJobs.size(), USER_JOB_MATCH_RATE);
             } else {
                 return "Вообще ничего не подходит, попробуйте понизить планку...";
             }
-        } else if (SHOW_JOBS.equals(serviceCommand) && appUser.getIsActive()) {
-            return jobService.showDownloadedJobs(appUser);
-        } else if (DOWNLOAD_JOBS.equals(serviceCommand)) {
-            ResponseEntity<JobListingDTO[]> response = jobService.collectJobs(appUser, "Java%20Developer", "Singapore");
-            if (response.getStatusCode().name().equals("OK")) {
-                return String.format("В базу загружено %d новых вакансий, для просмотра нажмите /show_jobs", response.getBody().length);
-//                return "Новый список вакансий загружен и отфильтрован исходя из вашего резюме \n" +
-//                        "Для просмотра вакансий и генерации резюме команда /match_jobs";
-            }
-            return "Что-то пошло не так...";
+        } else if (SHOW_MATCHED.equals(serviceCommand) && appUser.getIsActive()) {
+            return jobService.showMatchedJobs(appUser);
+        } else if (GENERATE_AND_SEND.equals(serviceCommand) && appUser.getIsActive()) {
+            return jobService.generateCoversAndSendAsAttachment(appUser);
         } else {
+//            Backdoor to talk to ChatGPT
 //            return openAIService.chatGPTRequestSessionBased(cmd);
             return "Вы не зарегистрированы! Чтобы начать использование бота зарегистрируйтесь: /registration " +
                     "Иначе вы ввели неизвестную команду! Чтобы посмотреть список доступных команд введите /help " +

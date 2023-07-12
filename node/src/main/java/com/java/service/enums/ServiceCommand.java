@@ -1,17 +1,23 @@
 package com.java.service.enums;
 
 public enum ServiceCommand {
-    HELP("/help"),
-    REGISTRATION("/registration"),
-    CANCEL("/cancel"),
+
     START("/start"),
 
-    SHOW_JOBS("/show_jobs"),
+    REGISTRATION("/registration"),
 
     DOWNLOAD_JOBS("/download_jobs"),
 
-    MATCH_JOBS("/match_jobs"),
+    SHOW_DOWNLOADED("/show_downloaded"),
+
+    MATCH("/match"),
+
+    SHOW_MATCHED("/show_matched"),
+
     GENERATE_AND_SEND("/generate_and_send"),
+    HELP("/help"),
+    CANCEL("/cancel"),
+
     MENU("/menu");
     private final String value;
 

@@ -76,10 +76,11 @@ public class JobServiceImpl implements JobService {
     }
 
     public List<JobListingDTO> matchJobs(AppUser appUser, int matchPercentage) {
-        List<JobListingDTO> jobListingDTOS = jobListingDTORepository.findAll();
+        List<JobListingDTO> jobListingDTOS = jobListingDTORepository.findByUserId(appUser.getId());
         double userMatchValue = matchPercentage / 100.0;
         List<JobListingDTO> filteredJobs = new ArrayList<>(jobListingDTOS);
         log.info("Начинаем анализ {} вакансий с заданным порогом совпадения {} %", jobListingDTOS.size(), matchPercentage);
+        // TODO Pfменить на новый репозиторий как будет
         CurriculumVitae curriculumVitae = curriculumVitaeRepository.findByIdWithJobExperiences(appUser.getId());
         for (JobListingDTO job : jobListingDTOS) {
             StringBuilder promptToCalculateJobMatchingRate = new StringBuilder();
@@ -98,10 +99,11 @@ public class JobServiceImpl implements JobService {
     }
 
     @Override
-    public String showJobs(AppUser appUser) {
+    public String generateCoversAndSendAsAttachment(AppUser appUser) {
         List<String> jobs = new ArrayList<>();
         jobs.add(String.format(EMAIL_PREFIX, appUser.getEmail()));
         List<JobListing> jobList = jobListingRepository.findAll();
+
         for (JobListing job : jobList) {
             String messageString = String.format("Company: %s, Job Title: %s,  \n",
                     job.getCompanyName(), job.getJobTitle());
@@ -123,6 +125,18 @@ public class JobServiceImpl implements JobService {
     public String showDownloadedJobs(AppUser appUser) {
         List<String> jobs = new ArrayList<>();
         List<JobListingDTO> jobList = jobListingDTORepository.findByUserId(appUser.getId());
+        generateJobListStingForTelegram(jobs, jobList);
+        return String.join("", jobs);
+    }
+
+    public String showMatchedJobs(AppUser appUser) {
+        List<String> jobs = new ArrayList<>();
+        List<JobListingDTO> jobList = jobListingDTORepository.findByUserIdMatched(appUser.getId(), JobMatchState.MATCH);
+        generateJobListStingForTelegram(jobs, jobList);
+        return String.join("", jobs);
+    }
+
+    private static void generateJobListStingForTelegram(List<String> jobs, List<JobListingDTO> jobList) {
         if (jobList.size() > 0) {
             for (JobListingDTO job : jobList) {
                 String answerForMatch = "No";
@@ -136,13 +150,11 @@ public class JobServiceImpl implements JobService {
                     answerForCover = "Yes";
                 }
                 String messageString = String.format(
-                        "Job Id: %d \n" +
-                                "Company: %s \n" +
+                        "Company: %s \n" +
                                 "Job Title: %s \n" +
                                 "Match: %s \n" +
                                 "Cover sent: %s \n" +
                                 "Link: %s \n",
-                        job.getId(),
                         job.getCompanyName(),
                         job.getJobTitle(),
                         answerForMatch,
@@ -151,11 +163,10 @@ public class JobServiceImpl implements JobService {
                 jobs.add(messageString);
             }
         }
-        return String.join("", jobs);
     }
 
-    @Override
-    public CompletableFuture<List<String>> generateCoverLetters(AppUser appUser, List<JobListing> jobList) {
+
+    private CompletableFuture<List<String>> generateCoverLetters(AppUser appUser, List<JobListing> jobList) {
         CurriculumVitae curriculumVitae = curriculumVitaeRepository.findByIdWithJobExperiences(appUser.getId());
         List<CompletableFuture<String>> coverLetterFutures = new ArrayList<>();
 

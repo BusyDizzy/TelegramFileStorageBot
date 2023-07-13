@@ -72,11 +72,6 @@ public class FileServiceImpl implements FileService {
         }
     }
 
-//    public void parseDoc(BinaryContent binaryContent){
-//        String text = cvParsingService.parseCvToPlainText(new ByteArrayInputStream(binaryContent.getFileAsArrayOfBytes()));
-//
-//    }
-
     @Override
     public AppPhoto processPhoto(Message telegramMessage) {
         //TODO пока что обрабатывается одно фото в сообщении
@@ -119,7 +114,6 @@ public class FileServiceImpl implements FileService {
                 .fileSize(telegramDoc.getFileSize())
                 .build();
     }
-
 
     private AppPhoto buildTransientAppPhoto(PhotoSize telegramPhoto, BinaryContent persistentBinaryContent) {
         return AppPhoto.builder()

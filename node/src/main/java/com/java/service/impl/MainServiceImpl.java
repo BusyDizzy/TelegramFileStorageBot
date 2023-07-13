@@ -5,6 +5,7 @@ import com.java.entity.AppDocument;
 import com.java.entity.AppPhoto;
 import com.java.entity.AppUser;
 import com.java.entity.RawData;
+import com.java.entity.enums.UserState;
 import com.java.exceptions.UploadFileException;
 import com.java.repository.AppUserRepository;
 import com.java.repository.RawDataRepository;
@@ -23,7 +24,6 @@ import java.util.Objects;
 import java.util.Optional;
 
 import static com.java.entity.enums.UserState.*;
-import static com.java.service.enums.ServiceCommand.*;
 
 @Service
 @Slf4j
@@ -37,13 +37,14 @@ public class MainServiceImpl implements MainService {
 
     private final JobService jobService;
 
+    private static String SEARCH_QUERY = null;
+
+    private static String LOCATION = null;
+
     private static final int CHUNK_SIZE = 4095;
 
     private final Integer USER_JOB_MATCH_RATE = 70;
 
-    private static final String SEARCH_QUERY = "Java%20Developer";
-
-    private static final String SEARCH_LOCATION = "Singapore";
 
     private final OpenAIService openAIService;
 
@@ -67,27 +68,49 @@ public class MainServiceImpl implements MainService {
     public void processTextMessage(Update update) {
         saveRawData(update);
         var appUser = findOrSaveAppUser(update);
-        var userState = appUser.getState();
-        var text = update.getMessage().getText();
-        var output = "";
-
-        var serviceCommand = ServiceCommand.fromValue(text);
-
-        if (CANCEL.equals(serviceCommand)) {
-            output = cancelProcess(appUser);
-        } else if (BASIC_STATE.equals(userState)) {
-            output = processServiceCommand(appUser, text);
-        } else if (WAIT_FOR_EMAIL_STATE.equals(userState)) {
-            output = appUserService.setEmail(appUser, text);
-        } else if (WAIT_FOR_CV.equals(userState)) {
-            ////////////////////
-            output = appUserService.setEmail(appUser, text);
-        } else {
-            log.error("Unknown user state: " + userState);
-            output = "Неизвестная ошибка! Введите /cancel и попробуйте снова!";
-        }
-
+        UserState userState = appUser.getState();
         var chatId = update.getMessage().getChatId();
+        var text = update.getMessage().getText();
+        ServiceCommand serviceCommand = ServiceCommand.fromValue(text);
+
+        String output = "";
+
+        if (serviceCommand == ServiceCommand.CANCEL) {
+            output = cancelProcess(appUser);
+        } else {
+            switch (userState) {
+                case BASIC_STATE:
+                case SEARCH_STRING_READY:
+                    output = processServiceCommand(appUser, text);
+                    break;
+                case WAIT_FOR_SEARCH_INPUT_QUERY:
+                    if (text.length() > 0) {
+                        SEARCH_QUERY = text.replace(" ", "%20");
+                    } else {
+                        SEARCH_QUERY = text;
+                    }
+                    appUser.setState(WAIT_FOR_SEARCH_INPUT_LOCATION);
+                    appUserRepository.save(appUser);
+                    output = "Введите регион поиска";
+                    break;
+                case WAIT_FOR_SEARCH_INPUT_LOCATION:
+                    LOCATION = text;
+                    appUser.setState(SEARCH_STRING_READY);
+                    appUserRepository.save(appUser);
+                    output = "Теперь нажмите /download";
+                    break;
+                case WAIT_FOR_EMAIL_STATE:
+                    output = appUserService.setEmail(appUser, text);
+                    break;
+                case WAIT_FOR_CV:
+                    output = "Загрузите ваше резюме в Телеграм Бот в формате docx, docs, txt. " +
+                            "Для отмены введите /cancel ";
+                    break;
+                default:
+                    log.error("Unknown user state: " + userState);
+                    output = "Неизвестная ошибка! Введите /cancel и попробуйте снова!";
+            }
+        }
         sendAnswer(output, chatId);
     }
 
@@ -98,16 +121,17 @@ public class MainServiceImpl implements MainService {
         var chatId = update.getMessage().getChatId();
         if (appUser.getState().equals(WAIT_FOR_CV)) {
             appUser.setState(BASIC_STATE);
+            appUserRepository.save(appUser);
             if (isNotAllowedToSendContent(chatId, appUser)) {
                 return;
             }
             try {
                 AppDocument doc = fileService.processDoc(update.getMessage(), appUser);
-                String link = fileService.generateLink(doc.getId(), LinkType.GET_DOC);
+//              String link = fileService.generateLink(doc.getId(), LinkType.GET_DOC);
 //            var answer = "Документ успешно загружен! "
 //                    + " Ссылка для скачивания: " + link;
                 var answer = "Ваше резюме успешно загружено, теперь, можете перейти к следующему шагу" +
-                        " и скачать вакансии /download_jobs";
+                        " и скачать вакансии /download";
                 sendAnswer(answer, chatId);
             } catch (UploadFileException exp) {
                 log.error(String.valueOf(exp));
@@ -177,51 +201,60 @@ public class MainServiceImpl implements MainService {
 
     private String processServiceCommand(AppUser appUser, String cmd) {
         var serviceCommand = ServiceCommand.fromValue(cmd);
-        if (REGISTRATION.equals(serviceCommand)) {
-            return appUserService.registerUser(appUser);
-        } else if (HELP.equals(serviceCommand)) {
-            return help();
-
-        } else if (UPLOAD_CV.equals(serviceCommand)) {
-            appUser.setState(WAIT_FOR_CV);
-            appUserRepository.save(appUser);
-            return "Загрузите ваше резюме в формате docx, doc, txt в Телеграм бот";
-        } else if (START.equals(serviceCommand)) {
-            return "Приветствую! Для того чтобы начать использовать бот, необходимо набрать: /registration " +
+        return switch (serviceCommand) {
+            case REGISTRATION -> appUserService.registerUser(appUser);
+            case HELP -> help();
+            case UPLOAD_CV -> {
+                appUser.setState(WAIT_FOR_CV);
+                appUserRepository.save(appUser);
+                yield "Загрузите ваше резюме в формате docx, doc, txt в Телеграм бот";
+            }
+            case START -> "Приветствую! Для того чтобы начать использовать бот, необходимо набрать: /registration " +
                     "Чтобы посмотреть список доступных команд введите /help";
-        } else if (DOWNLOAD_JOBS.equals(serviceCommand) && appUser.getIsActive()) {
-            ResponseEntity<JobListingDTO[]> response = jobService.collectJobs(
-                    appUser, SEARCH_QUERY, SEARCH_LOCATION);
-            if (response.getStatusCode().name().equals("OK")) {
-                return String.format("В базу загружено %d новых вакансий, " +
-                        "для просмотра нажмите /show_downloaded", Objects.requireNonNull(response.getBody()).length);
+            case DOWNLOAD_JOBS -> {
+                if (appUser.getIsActive()) {
+                    if (appUser.getState().equals(BASIC_STATE)) {
+                        appUser.setState(WAIT_FOR_SEARCH_INPUT_QUERY);
+                        appUserRepository.save(appUser);
+                        yield "Введите название вакансии";
+                    } else if (appUser.getState().equals(SEARCH_STRING_READY)) {
+                        appUser.setState(BASIC_STATE);
+                        appUserRepository.save(appUser);
+                        ResponseEntity<JobListingDTO[]> response = jobService.collectJobs(
+                                appUser, SEARCH_QUERY, LOCATION);
+                        if (response.getStatusCode().name().equals("OK")) {
+                            yield String.format("В базу загружено %d новых вакансий, " +
+                                    "для просмотра нажмите /show_downloaded", Objects.requireNonNull(response.getBody()).length);
+                        }
+                        yield "Что-то пошло не так...";
+                    }
+                }
+                yield defaultResponse();
             }
-            return "Что-то пошло не так...";
-        } else if (SHOW_DOWNLOADED.equals(serviceCommand) && appUser.getIsActive()) {
-            return jobService.showDownloadedJobs(appUser);
-        } else if (MATCH.equals(serviceCommand)) {
-            List<JobListingDTO> filteredJobs = jobService.matchJobs(appUser, USER_JOB_MATCH_RATE);
-            if (filteredJobs.size() > 0) {
-                return String.format("Отфильтровано %d вакансий, подходящих вам с заданным рейтингом %d" +
-                                " Нажмите /show_matched для просмотра результатов.",
-                        filteredJobs.size(), USER_JOB_MATCH_RATE);
-            } else {
-                return "Вообще ничего не подходит, попробуйте понизить планку...";
+            case SHOW_DOWNLOADED -> appUser.getIsActive() ? jobService.showDownloadedJobs(appUser) : defaultResponse();
+            case MATCH -> {
+                List<JobListingDTO> filteredJobs = jobService.matchJobs(appUser, USER_JOB_MATCH_RATE);
+                if (filteredJobs.size() > 0) {
+                    yield String.format("Отфильтровано %d вакансий, подходящих вам с заданным рейтингом %d" +
+                                    " Нажмите /show_matched для просмотра результатов.",
+                            filteredJobs.size(), USER_JOB_MATCH_RATE);
+                }
+                yield "Вообще ничего не подходит, попробуйте понизить планку...";
             }
-        } else if (SHOW_MATCHED.equals(serviceCommand) && appUser.getIsActive()) {
-            return jobService.showMatchedJobs(appUser);
-        } else if (GENERATE_AND_SEND.equals(serviceCommand) && appUser.getIsActive()) {
-            return jobService.generateCoversAndSendAsAttachment(appUser);
-        } else {
-//            Backdoor to talk to ChatGPT
-//            return openAIService.chatGPTRequestSessionBased(cmd);
-//            jobService.shortenExistingUrls(appUser);
-            return "Вы не зарегистрированы! Чтобы начать использование бота зарегистрируйтесь: /registration " +
-                    "Иначе вы ввели неизвестную команду! Чтобы посмотреть список доступных команд введите /help " +
-                    "или нажмите кнопку меню!";
-        }
+            case SHOW_MATCHED -> appUser.getIsActive() ? jobService.showMatchedJobs(appUser) : defaultResponse();
+            case GENERATE_AND_SEND ->
+                    appUser.getIsActive() ? jobService.generateCoversAndSendAsAttachment(appUser) : defaultResponse();
+            default -> defaultResponse();
+        };
     }
 
+    private String defaultResponse() {
+//              Backdoor to talk to ChatGPT
+//              return openAIService.chatGPTRequestSessionBased(cmd);
+        return "Вы не зарегистрированы! Чтобы начать использование бота зарегистрируйтесь: /registration " +
+                "Иначе вы ввели неизвестную команду! Чтобы посмотреть список доступных команд введите /help " +
+                "или нажмите кнопку меню!";
+    }
 
     private String help() {
         return """

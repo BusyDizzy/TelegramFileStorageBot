@@ -2,6 +2,7 @@ package com.java.strategy.impl;
 
 import com.java.DTO.JobListingDTO;
 import com.java.entity.enums.JobMatchState;
+import com.java.service.UrlShortener;
 import com.java.strategy.Strategy;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.HttpStatusException;
@@ -22,6 +23,12 @@ public class LinkedInStrategyImpl implements Strategy {
 
     private static final Random RANDOM = new Random();
 
+    private static final Integer LINKEDIN_JOBS_LIMIT = 50;
+
+    private static final Integer LINKEDIN_JOBS_OFFSET = 25;
+
+    private final UrlShortener urlShortener;
+
     private final static String URL_FORMAT = "https://www.linkedin.com/jobs/search/?currentJobId=3656884339&geoId=102454443&keywords=%s&location=%s&refresh=true&start=%d";
 
     private static final String[] USER_AGENTS = {
@@ -32,6 +39,10 @@ public class LinkedInStrategyImpl implements Strategy {
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36",
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_5) AppleWebKit/603.2.4 (KHTML, like Gecko) Version/10.1.1 Safari/603.2.4"
     };
+
+    public LinkedInStrategyImpl(UrlShortener urlShortener) {
+        this.urlShortener = urlShortener;
+    }
 
     private static String getRandomUserAgent() {
         int randomIndex = RANDOM.nextInt(USER_AGENTS.length);
@@ -111,7 +122,7 @@ public class LinkedInStrategyImpl implements Strategy {
                 String jobDescription = jobDescriptionElement != null ? jobDescriptionElement.text() : "Job description not available";
 
                 JobListingDTO jobListing = new JobListingDTO(null, jobId, jobTitle, companyName, jobDescription,
-                        jobUrl, JobMatchState.NOT_EVALUATED, false, appUserId);
+                        urlShortener.shortenURL(jobUrl), JobMatchState.NOT_EVALUATED, false, appUserId);
                 log.info("New job listing is added with job id {} for company: {}", jobId, companyName);
                 jobListings.add(jobListing);
 
@@ -121,9 +132,9 @@ public class LinkedInStrategyImpl implements Strategy {
                 } catch (InterruptedException e) {
                 }
             }
-            start += 25;
+            start += LINKEDIN_JOBS_OFFSET;
             log.info("Collected {} of LinkedIn records", start);
-            if (start == 25) {
+            if (start == LINKEDIN_JOBS_LIMIT) {
                 break;
             }
         } while (true);

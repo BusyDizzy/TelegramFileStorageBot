@@ -205,6 +205,7 @@ public class MainServiceImpl implements MainService {
         } else {
 //            Backdoor to talk to ChatGPT
 //            return openAIService.chatGPTRequestSessionBased(cmd);
+//            jobService.shortenExistingUrls(appUser);
             return "Вы не зарегистрированы! Чтобы начать использование бота зарегистрируйтесь: /registration " +
                     "Иначе вы ввели неизвестную команду! Чтобы посмотреть список доступных команд введите /help " +
                     "или нажмите кнопку меню!";

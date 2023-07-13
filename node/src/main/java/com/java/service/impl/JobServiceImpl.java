@@ -12,6 +12,7 @@ import com.java.repository.JobListingRepository;
 import com.java.service.AppUserService;
 import com.java.service.JobService;
 import com.java.service.OpenAIService;
+import com.java.service.UrlShortener;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -33,6 +34,8 @@ public class JobServiceImpl implements JobService {
     private final OpenAIService openAIService;
     private final JobListingRepository jobListingRepository;
 
+    private final UrlShortener urlShortener;
+
     private final JobListingDTORepository jobListingDTORepository;
 
     private final CurriculumVitaeRepository curriculumVitaeRepository;
@@ -46,7 +49,7 @@ public class JobServiceImpl implements JobService {
             "If its recruiting agency skip this part. If there are signs that company is proud to work on " +
             "a local market, tell about my desire to be a part of this country (where job is applicable). " +
             "Provide at the beginning several reasons why you would like to work on this company, " +
-            "and then why I am a good fit. Here goes my CV:";
+            "and then why I am a good fit. Use and apply The F-Shaped pattern for reading. Here goes my CV:";
 
     private static final String PROMPT_MESSAGE_FOR_JOB_MATCHER = "I will provide CV and job description after that. " +
             "Calculate the fit rate in double from 0 to 1 how my CV relates to the job description below and return " +
@@ -59,10 +62,11 @@ public class JobServiceImpl implements JobService {
 
     public JobServiceImpl(OpenAIServiceImpl openAIServiceImpl,
                           JobListingRepository jobListingRepository,
-                          JobListingDTORepository jobListingDTORepository, CurriculumVitaeRepository curriculumVitaeRepository,
+                          UrlShortener urlShortener, JobListingDTORepository jobListingDTORepository, CurriculumVitaeRepository curriculumVitaeRepository,
                           AppUserService appUserService, JobClient jobClient) {
         this.openAIService = openAIServiceImpl;
         this.jobListingRepository = jobListingRepository;
+        this.urlShortener = urlShortener;
         this.jobListingDTORepository = jobListingDTORepository;
         this.curriculumVitaeRepository = curriculumVitaeRepository;
         this.appUserService = appUserService;
@@ -159,7 +163,7 @@ public class JobServiceImpl implements JobService {
                                 "Job Title: %s \n" +
                                 "Match: %s \n" +
                                 "Cover sent: %s \n" +
-                                "Link: %s \n",
+                                "Link: %s \n \n",
                         job.getCompanyName(),
                         job.getJobTitle(),
                         answerForMatch,

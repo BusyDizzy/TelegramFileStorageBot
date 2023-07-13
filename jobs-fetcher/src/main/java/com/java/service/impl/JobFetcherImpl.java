@@ -28,9 +28,10 @@ public class JobFetcherImpl implements JobFetcher {
         List<JobListingDTO> allJobListings = new ArrayList<>();
         for (Strategy strategy : strategies.values()) {
             List<JobListingDTO> jobListings = strategy.getVacancies(query, location, appUserId);
-            allJobListings.addAll(jobListings);
             // Removing old entries based on website job Id
             removeExistingEntries(jobListings, appUserId);
+            // Возвращаем только новые
+            allJobListings.addAll(jobListings);
             // save jobListings to database
             jobRepository.saveAll(jobListings);
         }

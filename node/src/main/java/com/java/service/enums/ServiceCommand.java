@@ -6,6 +6,8 @@ public enum ServiceCommand {
 
     REGISTRATION("/registration"),
 
+    UPLOAD_CV("/upload_resume"),
+
     DOWNLOAD_JOBS("/download"),
 
     SHOW_DOWNLOADED("/show_downloaded"),

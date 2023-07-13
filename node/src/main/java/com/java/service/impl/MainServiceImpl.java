@@ -22,8 +22,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-import static com.java.entity.enums.UserState.BASIC_STATE;
-import static com.java.entity.enums.UserState.WAIT_FOR_EMAIL_STATE;
+import static com.java.entity.enums.UserState.*;
 import static com.java.service.enums.ServiceCommand.*;
 
 @Service
@@ -41,6 +40,10 @@ public class MainServiceImpl implements MainService {
     private static final int CHUNK_SIZE = 4095;
 
     private final Integer USER_JOB_MATCH_RATE = 70;
+
+    private static final String SEARCH_QUERY = "Java%20Developer";
+
+    private static final String SEARCH_LOCATION = "Singapore";
 
     private final OpenAIService openAIService;
 
@@ -76,6 +79,9 @@ public class MainServiceImpl implements MainService {
             output = processServiceCommand(appUser, text);
         } else if (WAIT_FOR_EMAIL_STATE.equals(userState)) {
             output = appUserService.setEmail(appUser, text);
+        } else if (WAIT_FOR_CV.equals(userState)) {
+            ////////////////////
+            output = appUserService.setEmail(appUser, text);
         } else {
             log.error("Unknown user state: " + userState);
             output = "Неизвестная ошибка! Введите /cancel и попробуйте снова!";
@@ -90,20 +96,27 @@ public class MainServiceImpl implements MainService {
         saveRawData(update);
         var appUser = findOrSaveAppUser(update);
         var chatId = update.getMessage().getChatId();
-
-        if (isNotAllowedToSendContent(chatId, appUser)) {
-            return;
-        }
-        try {
-            AppDocument doc = fileService.processDoc(update.getMessage());
-            String link = fileService.generateLink(doc.getId(), LinkType.GET_DOC);
-            var answer = "Документ успешно загружен! "
-                    + " Ссылка для скачивания: " + link;
+        if (appUser.getState().equals(WAIT_FOR_CV)) {
+            appUser.setState(BASIC_STATE);
+            if (isNotAllowedToSendContent(chatId, appUser)) {
+                return;
+            }
+            try {
+                AppDocument doc = fileService.processDoc(update.getMessage(), appUser);
+                String link = fileService.generateLink(doc.getId(), LinkType.GET_DOC);
+//            var answer = "Документ успешно загружен! "
+//                    + " Ссылка для скачивания: " + link;
+                var answer = "Ваше резюме успешно загружено, теперь, можете перейти к следующему шагу" +
+                        " и скачать вакансии /download_jobs";
+                sendAnswer(answer, chatId);
+            } catch (UploadFileException exp) {
+                log.error(String.valueOf(exp));
+                String error = "К сожалению, загрузка файла не удалась. Повторите попытку позже";
+                sendAnswer(error, chatId);
+            }
+        } else {
+            var answer = "Для загрузки документов нажмите /upload_resume";
             sendAnswer(answer, chatId);
-        } catch (UploadFileException exp) {
-            log.error(String.valueOf(exp));
-            String error = "К сожалению, загрузка файла не удалась. Повторите попытку позже";
-            sendAnswer(error, chatId);
         }
     }
 
@@ -142,13 +155,6 @@ public class MainServiceImpl implements MainService {
         return false;
     }
 
-    //    private void sendAnswer(String output, Long chatId) {
-//        SendMessage sendMessage = new SendMessage();
-//        sendMessage.setChatId(chatId);
-//        sendMessage.setText(output);
-//
-//        service.produceAnswer(sendMessage);
-//    }
     private void sendAnswer(String output, Long chatId) {
         int length = output.length();
 
@@ -176,12 +182,16 @@ public class MainServiceImpl implements MainService {
         } else if (HELP.equals(serviceCommand)) {
             return help();
 
+        } else if (UPLOAD_CV.equals(serviceCommand)) {
+            appUser.setState(WAIT_FOR_CV);
+            appUserRepository.save(appUser);
+            return "Загрузите ваше резюме в формате docx, doc, txt в Телеграм бот";
         } else if (START.equals(serviceCommand)) {
             return "Приветствую! Для того чтобы начать использовать бот, необходимо набрать: /registration " +
                     "Чтобы посмотреть список доступных команд введите /help";
         } else if (DOWNLOAD_JOBS.equals(serviceCommand) && appUser.getIsActive()) {
             ResponseEntity<JobListingDTO[]> response = jobService.collectJobs(
-                    appUser, "Java%20Developer", "Singapore");
+                    appUser, SEARCH_QUERY, SEARCH_LOCATION);
             if (response.getStatusCode().name().equals("OK")) {
                 return String.format("В базу загружено %d новых вакансий, " +
                         "для просмотра нажмите /show_downloaded", Objects.requireNonNull(response.getBody()).length);
@@ -215,9 +225,9 @@ public class MainServiceImpl implements MainService {
 
     private String help() {
         return """
-                Список доступных команд:
-                /cancel - отмена выполнения текущей команды;
-                /registration - регистрация пользователя.""";
+                Для начала работы с сервисом по подбору вакансий и генерации сопроводительных писем на базе ИИ,
+                нажмите: /registration и зарегистрируйтесь введя свой email.
+                """;
     }
 
     private String cancelProcess(AppUser appUser) {

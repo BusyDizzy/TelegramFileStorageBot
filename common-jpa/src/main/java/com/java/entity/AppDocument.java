@@ -23,4 +23,8 @@ public class AppDocument {
     private BinaryContent binaryContent;
     private String mimeType;
     private Long fileSize;
+
+    @ManyToOne
+    @JoinColumn(name = "app_user_id")
+    private AppUser appUser;
 }

@@ -41,6 +41,19 @@ public class AppUser {
     @OneToMany(mappedBy = "appUser", cascade = CascadeType.ALL)
     private List<JobListingDTO> jobListingDTOList;
 
+    @OneToMany(mappedBy = "appUser", cascade = CascadeType.ALL)
+    private List<AppDocument> appDocuments;
+
+    public void addDocument(AppDocument appDocument){
+        this.appDocuments.add(appDocument);
+        appDocument.setAppUser(this);
+    }
+
+    public void removeDocument(AppDocument appDocument){
+        this.appDocuments.remove(appDocument);
+        appDocument.setAppUser(null);
+    }
+
     public void addCurriculumVitae(CurriculumVitae curriculumVitae) {
         this.curriculumVitaeList.add(curriculumVitae);
         curriculumVitae.setAppUser(this);

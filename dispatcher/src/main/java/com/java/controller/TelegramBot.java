@@ -50,6 +50,7 @@ public class TelegramBot extends TelegramWebhookBot {
             List<BotCommand> menu = new ArrayList<>();
             menu.add(new BotCommand("/start", "Welcome message"));
             menu.add(new BotCommand("/registration", "Register to start"));
+            menu.add(new BotCommand("/upload_resume", "Upload your cv"));
             menu.add(new BotCommand("/download", "Downloads jobs from LinkedIn(now)"));
             menu.add(new BotCommand("/show_downloaded", "Show all jobs in database"));
             menu.add(new BotCommand("/match", "Matches you CV to jobs in database with defined rate"));

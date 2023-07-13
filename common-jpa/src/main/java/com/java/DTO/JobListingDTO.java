@@ -23,7 +23,7 @@ public class JobListingDTO {
     private String jobTitle;
     @Column(length = 500)
     private String companyName;
-    @Column(columnDefinition = "LONGTEXT")
+    @Column(columnDefinition = "TEXT")
     private String jobDescription;
     @Column(length = 500)
     private String url;

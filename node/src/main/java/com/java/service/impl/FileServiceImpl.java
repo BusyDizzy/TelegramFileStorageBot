@@ -2,11 +2,13 @@ package com.java.service.impl;
 
 import com.java.entity.AppDocument;
 import com.java.entity.AppPhoto;
+import com.java.entity.AppUser;
 import com.java.entity.BinaryContent;
 import com.java.exceptions.UploadFileException;
 import com.java.repository.AppDocumentRepository;
 import com.java.repository.AppPhotoRepository;
 import com.java.repository.BinaryContentRepository;
+import com.java.service.CvParsingService;
 import com.java.service.FileService;
 import com.java.service.enums.LinkType;
 import com.java.utils.CryptoTool;
@@ -44,27 +46,36 @@ public class FileServiceImpl implements FileService {
 
     private final CryptoTool cryptoTool;
 
-    public FileServiceImpl(AppDocumentRepository appDocumentRepository, AppPhotoRepository appPhotoRepository, BinaryContentRepository binaryContentRepository, CryptoTool cryptoTool) {
+    private final CvParsingService cvParsingService;
+
+    public FileServiceImpl(AppDocumentRepository appDocumentRepository, AppPhotoRepository appPhotoRepository, BinaryContentRepository binaryContentRepository, CryptoTool cryptoTool, CvParsingService cvParsingService) {
         this.appDocumentRepository = appDocumentRepository;
         this.appPhotoRepository = appPhotoRepository;
         this.binaryContentRepository = binaryContentRepository;
         this.cryptoTool = cryptoTool;
+        this.cvParsingService = cvParsingService;
     }
 
 
     @Override
-    public AppDocument processDoc(Message telegramMessage) {
+    public AppDocument processDoc(Message telegramMessage, AppUser appUser) {
         Document telegramDoc = telegramMessage.getDocument();
         String fileId = telegramDoc.getFileId();
         ResponseEntity<String> response = getFilePath(fileId);
         if (response.getStatusCode() == HttpStatus.OK) {
             BinaryContent persistentBinaryContent = getPersistentBinaryContent(response);
+            cvParsingService.parseAndSaveCv(persistentBinaryContent.getFileAsArrayOfBytes(), appUser);
             AppDocument transientAppDoc = buildTransientAppDoc(telegramDoc, persistentBinaryContent);
             return appDocumentRepository.save(transientAppDoc);
         } else {
             throw new UploadFileException("Bad response from telegram service: " + response);
         }
     }
+
+//    public void parseDoc(BinaryContent binaryContent){
+//        String text = cvParsingService.parseCvToPlainText(new ByteArrayInputStream(binaryContent.getFileAsArrayOfBytes()));
+//
+//    }
 
     @Override
     public AppPhoto processPhoto(Message telegramMessage) {

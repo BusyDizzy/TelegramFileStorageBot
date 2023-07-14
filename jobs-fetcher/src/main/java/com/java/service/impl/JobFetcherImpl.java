@@ -3,6 +3,7 @@ package com.java.service.impl;
 import com.java.DTO.JobListingDTO;
 import com.java.repository.JobListingDTORepository;
 import com.java.service.JobFetcher;
+import com.java.service.UrlShortener;
 import com.java.strategy.Strategy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @Slf4j
@@ -18,16 +20,19 @@ public class JobFetcherImpl implements JobFetcher {
     private final JobListingDTORepository jobRepository;
     private final Map<String, Strategy> strategies;
 
-    public JobFetcherImpl(JobListingDTORepository jobRepository, Map<String, Strategy> strategies) {
+    private final UrlShortener urlShortener;
+
+    public JobFetcherImpl(JobListingDTORepository jobRepository, Map<String, Strategy> strategies, UrlShortener urlShortener) {
         this.jobRepository = jobRepository;
         this.strategies = strategies;
+        this.urlShortener = urlShortener;
     }
 
     @Override
     public List<JobListingDTO> getJobListingsAndSave(String query, String location, Long appUserId) {
         List<JobListingDTO> allJobListings = new ArrayList<>();
         for (Strategy strategy : strategies.values()) {
-            List<JobListingDTO> jobListings = strategy.getVacancies(query, location, appUserId);
+            Set<JobListingDTO> jobListings = strategy.getVacancies(query, location, appUserId);
             // Removing old entries based on website job Id
             removeExistingEntries(jobListings, appUserId);
             // Возвращаем только новые
@@ -39,7 +44,7 @@ public class JobFetcherImpl implements JobFetcher {
     }
 
     // TODO Проверить работу
-    private void removeExistingEntries(List<JobListingDTO> jobListingDTOS, Long appUserId) {
+    private void removeExistingEntries(Set<JobListingDTO> jobListingDTOS, Long appUserId) {
         List<JobListingDTO> databaseEntries = jobRepository.findByUserId(appUserId);
         int counter = 0;
         for (JobListingDTO dbJob : databaseEntries) {
@@ -49,6 +54,12 @@ public class JobFetcherImpl implements JobFetcher {
                 jobListingDTOS.remove(dbJob);
                 counter++;
             }
+        }
+
+        for (JobListingDTO jobToSave : jobListingDTOS){
+            // Setting up a short Url to job object that would be saved to db
+            String url = jobToSave.getUrl();
+            jobToSave.setUrl(urlShortener.shortenURL(url));
         }
         log.info("Total removed old job listings number: {} " +
                 "New job listings would be added to database: {}", counter, jobListingDTOS.size());

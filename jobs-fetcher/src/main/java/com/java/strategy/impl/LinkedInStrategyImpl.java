@@ -2,7 +2,7 @@ package com.java.strategy.impl;
 
 import com.java.DTO.JobListingDTO;
 import com.java.entity.enums.JobMatchState;
-import com.java.service.UrlShortener;
+import com.java.service.fetching.LinkedInLocationService;
 import com.java.strategy.Strategy;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.HttpStatusException;
@@ -13,9 +13,9 @@ import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Random;
+import java.util.Set;
 
 @Service
 @Slf4j
@@ -27,9 +27,15 @@ public class LinkedInStrategyImpl implements Strategy {
 
     private static final Integer LINKEDIN_JOBS_OFFSET = 25;
 
-    private final UrlShortener urlShortener;
+    private final LinkedInLocationService linkedInLocationService;
 
-    private final static String URL_FORMAT = "https://www.linkedin.com/jobs/search/?currentJobId=3656884339&geoId=102454443&keywords=%s&location=%s&refresh=true&start=%d";
+//    private final static String URL_FORMAT = "https://www.linkedin.com/jobs/search/?currentJobId=3656884339&geoId=102454443&keywords=%s&location=%s&refresh=true&start=%d";
+
+//    private final static String URL_FORMAT = "https://www.linkedin.com/jobs/search/?currentJobId=3656884339&geoId=%s&keywords=%s&refresh=true";
+
+    private final static String URL_FORMAT_PAST_WEEK = "https://www.linkedin.com/jobs/search/?keywords=%s&geoId=%s&f_TPR=r604800&position=1&pageNum=0";
+
+    private final static String URL_FORMAT_PAST_MONTH = "https://www.linkedin.com/jobs/search/?keywords=%s&geoId=%s&f_TPR=r2592000&position=1&pageNum=0";
 
     private static final String[] USER_AGENTS = {
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3",
@@ -40,8 +46,8 @@ public class LinkedInStrategyImpl implements Strategy {
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_5) AppleWebKit/603.2.4 (KHTML, like Gecko) Version/10.1.1 Safari/603.2.4"
     };
 
-    public LinkedInStrategyImpl(UrlShortener urlShortener) {
-        this.urlShortener = urlShortener;
+    public LinkedInStrategyImpl(LinkedInLocationService linkedInLocationService) {
+        this.linkedInLocationService = linkedInLocationService;
     }
 
     private static String getRandomUserAgent() {
@@ -50,8 +56,9 @@ public class LinkedInStrategyImpl implements Strategy {
     }
 
     @Override
-    public List<JobListingDTO> getVacancies(String query, String location, Long appUserId) {
-        List<JobListingDTO> jobListings = new ArrayList<>();
+    public Set<JobListingDTO> getVacancies(String query, String location, Long appUserId) {
+        String geoId = linkedInLocationService.getGeoIdByLocationName(location);
+        Set<JobListingDTO> jobListings = new HashSet<>();
         final int MAX_RETRY = 3; // Maximum number of retries
         final int DELAY_BETWEEN_REQUESTS = 5000; // Delay between requests in milliseconds
         log.info("Starting LinkedIn strategy job fetching");
@@ -61,7 +68,7 @@ public class LinkedInStrategyImpl implements Strategy {
             int retryCount = 0; // Reset retry count for each document
             while (true) {
                 try {
-                    document = getDocument(query, location, start);
+                    document = getDocument(query, geoId);
                     break; // If the document is fetched successfully, break the loop
                 } catch (HttpStatusException e) {
                     if (e.getStatusCode() == 502 || e.getStatusCode() == 429) {
@@ -122,8 +129,8 @@ public class LinkedInStrategyImpl implements Strategy {
                 String jobDescription = jobDescriptionElement != null ? jobDescriptionElement.text() : "Job description not available";
 
                 JobListingDTO jobListing = new JobListingDTO(null, jobId, jobTitle, companyName, jobDescription,
-                        urlShortener.shortenURL(jobUrl), JobMatchState.NOT_EVALUATED, false, appUserId);
-                log.info("New job listing is added with job id {} for company: {}", jobId, companyName);
+                        jobUrl, JobMatchState.NOT_EVALUATED, false, appUserId);
+                log.info("New job listing is fetched with job id {} for company: {}", jobId, companyName);
                 jobListings.add(jobListing);
 
                 // Sleep after fetching each job detail
@@ -133,18 +140,18 @@ public class LinkedInStrategyImpl implements Strategy {
                 }
             }
             start += LINKEDIN_JOBS_OFFSET;
-            log.info("Collected {} of LinkedIn records", start);
+            log.info("Fetched {} of LinkedIn records", start);
             if (start == LINKEDIN_JOBS_LIMIT) {
                 break;
             }
         } while (true);
-        log.info("Finished collection of {} LinkedIn job listings", jobListings.size());
+        log.info("Finished fetching of {} LinkedIn job listings", jobListings.size());
         return jobListings;
     }
 
 
-    protected Document getDocument(String searchString, String location, int start) throws IOException {
-        String url = String.format(URL_FORMAT, searchString, location, start);
+    protected Document getDocument(String searchString, String geoId) throws IOException {
+        String url = String.format(URL_FORMAT_PAST_MONTH, searchString, geoId);
         return Jsoup.connect(url)
                 .userAgent(getRandomUserAgent())
                 .referrer("http://www.google.com")

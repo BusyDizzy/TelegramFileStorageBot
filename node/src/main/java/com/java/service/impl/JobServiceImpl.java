@@ -34,8 +34,6 @@ public class JobServiceImpl implements JobService {
     private final OpenAIService openAIService;
     private final JobListingRepository jobListingRepository;
 
-    private final UrlShortener urlShortener;
-
     private final JobListingDTORepository jobListingDTORepository;
 
     private final CurriculumVitaeRepository curriculumVitaeRepository;
@@ -62,11 +60,11 @@ public class JobServiceImpl implements JobService {
 
     public JobServiceImpl(OpenAIServiceImpl openAIServiceImpl,
                           JobListingRepository jobListingRepository,
-                          UrlShortener urlShortener, JobListingDTORepository jobListingDTORepository, CurriculumVitaeRepository curriculumVitaeRepository,
+                          JobListingDTORepository jobListingDTORepository,
+                          CurriculumVitaeRepository curriculumVitaeRepository,
                           AppUserService appUserService, JobClient jobClient) {
         this.openAIService = openAIServiceImpl;
         this.jobListingRepository = jobListingRepository;
-        this.urlShortener = urlShortener;
         this.jobListingDTORepository = jobListingDTORepository;
         this.curriculumVitaeRepository = curriculumVitaeRepository;
         this.appUserService = appUserService;
@@ -134,7 +132,11 @@ public class JobServiceImpl implements JobService {
     public String showDownloadedJobs(AppUser appUser) {
         List<String> jobs = new ArrayList<>();
         List<JobListingDTO> jobList = jobListingDTORepository.findByUserId(appUser.getId());
-        generateJobListStingForTelegram(jobs, jobList);
+        if (jobList.size() > 0) {
+            generateJobListStingForTelegram(jobs, jobList);
+        } else {
+            return "В вашей базе пока нет скаченных вакансий";
+        }
         return String.join("", jobs);
     }
 

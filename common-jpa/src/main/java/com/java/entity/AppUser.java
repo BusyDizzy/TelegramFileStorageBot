@@ -34,6 +34,8 @@ public class AppUser {
     private Boolean isActive;
     @Enumerated(EnumType.STRING)
     private UserState state;
+    @Column(name = "is_cv_uploaded")
+    private Boolean isCvUploaded;
 
     @OneToMany(mappedBy = "appUser", cascade = CascadeType.ALL)
     private List<CurriculumVitae> curriculumVitaeList;

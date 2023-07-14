@@ -23,6 +23,7 @@ public class UserActivationServiceImpl implements UserActivationService {
         if (optional.isPresent()) {
             var user = optional.get();
             user.setIsActive(true);
+            user.setIsCvUploaded(false);
             appUserRepository.save(user);
             return true;
         }

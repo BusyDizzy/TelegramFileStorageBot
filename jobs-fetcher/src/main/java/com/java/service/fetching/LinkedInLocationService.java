@@ -1,5 +1,7 @@
 package com.java.service.fetching;
 
+import java.util.Optional;
+
 public interface LinkedInLocationService {
-    String getGeoIdByLocationName(String locationName);
+    Optional<String> getGeoIdByLocationName(String locationName);
 }

@@ -45,8 +45,11 @@ public class CvParsingServiceImpl implements CvParsingService {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        log.info("Saving document for user {}: ", appUser.getEmail());
-        return curriculumVitaeDTORepository.save(curriculumVitaeDTO);
+        CurriculumVitaeDTO savedCv = curriculumVitaeDTORepository.save(curriculumVitaeDTO);
+        appUser.setIsCvUploaded(true);
+        appUserRepository.save(appUser);
+        log.info("Document for user {} was uploaded", appUser.getEmail());
+        return savedCv;
     }
 
     private String parseCvToPlainText(InputStream cvFileStream) {

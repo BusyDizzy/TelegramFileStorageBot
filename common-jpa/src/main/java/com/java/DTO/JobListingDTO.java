@@ -37,9 +37,14 @@ public class JobListingDTO {
     private Boolean isCoverSend;
 
     private String contact;
+    @Column(name = "location")
+    private String location;
+    @Column(name = "source_website")
+    private String sourceWebsite;
 
     public JobListingDTO(Long id, String webSiteJobId, String jobTitle, String companyName,
-                         String jobDescription, String url, JobMatchState jobMatchState, Boolean isCoverSend, Long appUserId) {
+                         String jobDescription, String url, JobMatchState jobMatchState,
+                         Boolean isCoverSend, String location, String sourceWebsite, Long appUserId) {
         this.id = id;
         this.webSiteJobId = webSiteJobId;
         this.jobTitle = jobTitle;
@@ -48,6 +53,8 @@ public class JobListingDTO {
         this.jobMatchState = jobMatchState;
         this.isCoverSend = isCoverSend;
         this.url = url;
+        this.location =  location;
+        this.sourceWebsite = sourceWebsite;
         this.appUser = new AppUser();
         this.appUser.setId(appUserId);
     }

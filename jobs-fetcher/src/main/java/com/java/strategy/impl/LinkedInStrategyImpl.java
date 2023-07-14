@@ -23,7 +23,7 @@ public class LinkedInStrategyImpl implements Strategy {
 
     private static final Random RANDOM = new Random();
 
-    private static final Integer LINKEDIN_JOBS_LIMIT = 50;
+    private static final Integer LINKEDIN_JOBS_LIMIT = 25;
 
     private static final Integer LINKEDIN_JOBS_OFFSET = 25;
 
@@ -57,7 +57,7 @@ public class LinkedInStrategyImpl implements Strategy {
 
     @Override
     public Set<JobListingDTO> getVacancies(String query, String location, Long appUserId) {
-        String geoId = linkedInLocationService.getGeoIdByLocationName(location);
+        String geoId = linkedInLocationService.getGeoIdByLocationName(location).get();
         Set<JobListingDTO> jobListings = new HashSet<>();
         final int MAX_RETRY = 3; // Maximum number of retries
         final int DELAY_BETWEEN_REQUESTS = 5000; // Delay between requests in milliseconds
@@ -129,7 +129,7 @@ public class LinkedInStrategyImpl implements Strategy {
                 String jobDescription = jobDescriptionElement != null ? jobDescriptionElement.text() : "Job description not available";
 
                 JobListingDTO jobListing = new JobListingDTO(null, jobId, jobTitle, companyName, jobDescription,
-                        jobUrl, JobMatchState.NOT_EVALUATED, false, appUserId);
+                        jobUrl, JobMatchState.NOT_EVALUATED, false, location, "LinkedIn", appUserId);
                 log.info("New job listing is fetched with job id {} for company: {}", jobId, companyName);
                 jobListings.add(jobListing);
 

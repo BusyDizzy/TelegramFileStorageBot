@@ -45,9 +45,11 @@ public class JobServiceImpl implements JobService {
             "Provide at the beginning several reasons why you would like to work on this company, " +
             "and then why I am a good fit. Use and apply The F-Shaped pattern for reading. Here goes my CV:";
 
-    private static final String PROMPT_MESSAGE_FOR_JOB_MATCHER = "I will provide CV and job description after that. " +
+    private static final String PROMPT_MESSAGE_FOR_JOB_MATCHER = "I will provide CV and job description after that." +
             "Calculate the fit rate in double from 0 to 1 how my CV relates to the job description below and return " +
-            "only one digit in your answer from 0 to 1 without any explanations. ";
+            " If in the job description years of experience are more than my years of experience set score immediately 0 " +
+            "without further calculations" +
+            " In response I expect only one digit from 0 to 1 without any explanations. ";
     private final AppUserService appUserService;
 
     private List<JobListingDTO> currentDownloadedJobsList;
@@ -113,6 +115,12 @@ public class JobServiceImpl implements JobService {
         jobs.add(String.format(EMAIL_PREFIX, appUser.getEmail()));
         List<JobListingDTO> jobList = jobListingDTORepository.findByUserIdMatched(appUser.getId(), JobMatchState.MATCH);
 
+        if (jobList.isEmpty()) {
+            return "Похоже у вас еще нет совпадений либо вы не загрузили вакансии " +
+                    "Для поиска подходящих вакансий нажмите /match " +
+                    "Для загрузки /download_jobs";
+        }
+
         for (JobListingDTO job : jobList) {
             String messageString = String.format("Company: %s, Job Title: %s,  \n",
                     job.getCompanyName(), job.getJobTitle());
@@ -165,23 +173,26 @@ public class JobServiceImpl implements JobService {
                 }
                 String messageString = String.format(
                         """
+                                Location: %s\s
                                 Company: %s\s
                                 Job Title: %s\s
                                 Match: %s\s
                                 Cover sent: %s\s
+                                Website: %s\s
                                 Link: %s\s
                                 \s
                                 """,
+                        job.getLocation(),
                         job.getCompanyName(),
                         job.getJobTitle(),
                         answerForMatch,
                         answerForCover,
+                        job.getSourceWebsite(),
                         job.getUrl());
                 jobs.add(messageString);
             }
         }
     }
-
 
     private CompletableFuture<List<String>> generateCoverLetters(AppUser appUser, List<JobListingDTO> jobList) {
         Optional<CurriculumVitaeDTO> curriculumVitae = curriculumVitaeRepository.findById(appUser.getId());
@@ -197,13 +208,15 @@ public class JobServiceImpl implements JobService {
                 return null;
             }
             buildPromptForChatGPTForJobListingDTO(promptToGenerateCoverLetter, job);
+            if (!job.getIsCoverSend()) {
+                CompletableFuture<String> coverLetterFuture = openAIService.
+                        chatGPTRequestMemoryLess(promptToGenerateCoverLetter.toString());
 
-            CompletableFuture<String> coverLetterFuture = openAIService.
-                    chatGPTRequestMemoryLess(promptToGenerateCoverLetter.toString());
-            job.setIsCoverSend(true);
-            jobListingDTORepository.save(job);
+                job.setIsCoverSend(true);
+                jobListingDTORepository.save(job);
 
-            coverLetterFutures.add(coverLetterFuture);
+                coverLetterFutures.add(coverLetterFuture);
+            }
         }
 
         // Join all the futures into a single CompletableFuture that completes when all cover letters are generated
@@ -217,18 +230,6 @@ public class JobServiceImpl implements JobService {
                 .collect(Collectors.toList()));
     }
 
-
-//    private void buildPromptForChatGPTForUserData(StringBuilder promptToGenerateCoverLetter, String initializationPrompt,
-//                                                  CurriculumVitae curriculumVitae) {
-//        promptToGenerateCoverLetter
-//                .append(initializationPrompt).append("Here goes my CV: ")
-//                .append(replaceSymbolsWithSpaces(curriculumVitae.getFullName())).append(" ")
-//                .append(replaceSymbolsWithSpaces(curriculumVitae.getSummaryObjective())).append(" ")
-//                .append(replaceSymbolsWithSpaces(curriculumVitae.getSoftSkills())).append(" ")
-//                .append(replaceSymbolsWithSpaces(curriculumVitae.getHardSkills())).append(" ")
-//                .append(replaceSymbolsWithSpaces(curriculumVitae.getJobExperience().toString())).append(" ")
-//                .append(replaceSymbolsWithSpaces(curriculumVitae.getEducationHistory())).append(" ");
-//    }
 
     private void buildPromptForChatGPTForUserData(StringBuilder promptToGenerateCoverLetter, String initializationPrompt,
                                                   CurriculumVitaeDTO curriculumVitae) {

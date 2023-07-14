@@ -5,6 +5,7 @@ import com.java.repository.LinkedInLocationRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class LinkedInLocationServiceImpl implements LinkedInLocationService{
@@ -14,11 +15,11 @@ public class LinkedInLocationServiceImpl implements LinkedInLocationService{
         this.linkedInLocationRepository = linkedInLocationRepository;
     }
 
-    public String getGeoIdByLocationName(String locationName) {
+    public Optional<String> getGeoIdByLocationName(String locationName) {
         List<LinkedInLocation> linkedInLocations = linkedInLocationRepository.findByLocationNameContains(locationName);
         if (!linkedInLocations.isEmpty()) {
-            return linkedInLocations.get(0).getGeoId();
+            return Optional.ofNullable(linkedInLocations.get(0).getGeoId());
         }
-        return null; // or throw exception, or any other handling of your choice
+        return Optional.empty(); // or throw exception, or any other handling of your choice
     }
 }

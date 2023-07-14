@@ -12,6 +12,7 @@ import com.java.repository.RawDataRepository;
 import com.java.service.*;
 import com.java.service.enums.LinkType;
 import com.java.service.enums.ServiceCommand;
+import com.java.service.fetching.LinkedInLocationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,8 @@ public class MainServiceImpl implements MainService {
 
     private final JobService jobService;
 
+    private final LinkedInLocationService linkedInLocationService;
+
     private static String SEARCH_QUERY = null;
 
     private static String LOCATION = null;
@@ -54,13 +57,14 @@ public class MainServiceImpl implements MainService {
                            FileService fileService,
                            AppUserService appUserService,
                            JobService jobService,
-                           OpenAIService openAIService) {
+                           LinkedInLocationService linkedInLocationService, OpenAIService openAIService) {
         this.rawDataRepository = rawDataRepository;
         this.service = service;
         this.appUserRepository = appUserRepository;
         this.fileService = fileService;
         this.appUserService = appUserService;
         this.jobService = jobService;
+        this.linkedInLocationService = linkedInLocationService;
         this.openAIService = openAIService;
     }
 
@@ -79,7 +83,7 @@ public class MainServiceImpl implements MainService {
             output = cancelProcess(appUser);
         } else {
             switch (userState) {
-                case BASIC_STATE, CV_UPLOADED, SEARCH_STRING_READY -> output = processServiceCommand(appUser, text);
+                case BASIC_STATE, SEARCH_STRING_READY -> output = processServiceCommand(appUser, text);
                 case WAIT_FOR_SEARCH_INPUT_QUERY -> {
                     if (text.length() > 0) {
                         SEARCH_QUERY = text.replace(" ", "%20");
@@ -92,6 +96,14 @@ public class MainServiceImpl implements MainService {
                 }
                 case WAIT_FOR_SEARCH_INPUT_LOCATION -> {
                     LOCATION = text;
+                    // Checking if LinkedIn geoId is supported (stored in db)
+                    if (linkedInLocationService.getGeoIdByLocationName(text).isEmpty()) {
+                        output = "Поиск по данному региону пока не поддерживается. " +
+                                "Просьба связаться с разработчиком: anton.tk@gmail.com";
+                        appUser.setState(BASIC_STATE);
+                        appUserRepository.save(appUser);
+                        break;
+                    }
                     appUser.setState(SEARCH_STRING_READY);
                     appUserRepository.save(appUser);
                     output = "Теперь нажмите /download";
@@ -116,7 +128,7 @@ public class MainServiceImpl implements MainService {
         if (isNotAllowedToSendContent(chatId, appUser)) {
             return;
         }
-        appUser.setState(CV_UPLOADED);
+        appUser.setState(BASIC_STATE);
         appUserRepository.save(appUser);
         try {
             AppDocument doc = fileService.processDoc(update.getMessage(), appUser);
@@ -124,7 +136,7 @@ public class MainServiceImpl implements MainService {
 //            var answer = "Документ успешно загружен! "
 //                    + " Ссылка для скачивания: " + link;
             var answer = "Ваше резюме успешно загружено, теперь, можете перейти к следующему шагу" +
-                    " и скачать вакансии /download";
+                    " и скачать вакансии /download_jobs";
             sendAnswer(answer, chatId);
         } catch (UploadFileException exp) {
             log.error(String.valueOf(exp));
@@ -160,8 +172,8 @@ public class MainServiceImpl implements MainService {
             var error = "Зарегистрируйтесь или активируйте свою учетную запись для загрузки контента.";
             sendAnswer(error, chatId);
             return true;
-        } else if (!WAIT_FOR_CV.equals(userState)) {
-            var error = "Для загрузки документов нажмите /upload_resume";
+        } else if (appUser.getIsCvUploaded()) {
+            var error = "You have already uploaded cv. To update click: /update_resume";
 //            var error = "Отмените текущую команду с помощью /cancel для отправки файлов";
             sendAnswer(error, chatId);
             return true;
@@ -191,11 +203,12 @@ public class MainServiceImpl implements MainService {
 
     private String processServiceCommand(AppUser appUser, String cmd) {
         var serviceCommand = ServiceCommand.fromValue(cmd);
+        assert serviceCommand != null;
         return switch (serviceCommand) {
             case REGISTRATION -> appUserService.registerUser(appUser);
             case HELP -> help();
             case UPLOAD_CV -> {
-                if (!appUser.getState().equals(CV_UPLOADED)) {
+                if (!appUser.getIsCvUploaded()) {
                     appUser.setState(WAIT_FOR_CV);
                     appUserRepository.save(appUser);
                     yield "Загрузите ваше резюме в формате docx, doc, txt в Телеграм бот";
@@ -230,17 +243,28 @@ public class MainServiceImpl implements MainService {
             }
             case SHOW_DOWNLOADED -> appUser.getIsActive() ? jobService.showDownloadedJobs(appUser) : defaultResponse();
             case MATCH -> {
-                List<JobListingDTO> filteredJobs = jobService.matchJobs(appUser, USER_JOB_MATCH_RATE);
-                if (filteredJobs.size() > 0) {
-                    yield String.format("Отфильтровано %d вакансий, подходящих вам с заданным рейтингом %d" +
-                                    " Нажмите /show_matched для просмотра результатов.",
-                            filteredJobs.size(), USER_JOB_MATCH_RATE);
+                if (appUser.getIsCvUploaded()) {
+                    List<JobListingDTO> filteredJobs = jobService.matchJobs(appUser, USER_JOB_MATCH_RATE);
+                    if (filteredJobs.size() > 0) {
+                        yield String.format("Отфильтровано %d вакансий, подходящих вам с заданным рейтингом %d" +
+                                        " Нажмите /show_matched для просмотра результатов.",
+                                filteredJobs.size(), USER_JOB_MATCH_RATE);
+                    }
+                    yield "Вообще ничего не подходит, попробуйте понизить планку...";
+                } else {
+                    yield "Для начала работы с функционалом сравнения загрузите резюме /upload_resume";
                 }
-                yield "Вообще ничего не подходит, попробуйте понизить планку...";
             }
             case SHOW_MATCHED -> appUser.getIsActive() ? jobService.showMatchedJobs(appUser) : defaultResponse();
-            case GENERATE_AND_SEND ->
-                    appUser.getIsActive() ? jobService.generateCoversAndSendAsAttachment(appUser) : defaultResponse();
+            case GENERATE_AND_SEND -> {
+                if (appUser.getIsCvUploaded() && appUser.getIsActive()) {
+                    jobService.generateCoversAndSendAsAttachment(appUser);
+                } else {
+                    yield "Для начала работы с функционалом генерации сопроводительных писем" +
+                            " загрузите резюме /upload_resume";
+                }
+                yield "Какая-то оказия случилась...";
+            }
             case UPDATE, SUGGEST_IMPROVE -> underConstruction();
             default -> defaultResponse();
         };

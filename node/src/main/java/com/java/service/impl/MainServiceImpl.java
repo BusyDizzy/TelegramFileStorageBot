@@ -73,17 +73,14 @@ public class MainServiceImpl implements MainService {
         var text = update.getMessage().getText();
         ServiceCommand serviceCommand = ServiceCommand.fromValue(text);
 
-        String output = "";
+        String output;
 
         if (serviceCommand == ServiceCommand.CANCEL) {
             output = cancelProcess(appUser);
         } else {
             switch (userState) {
-                case BASIC_STATE:
-                case SEARCH_STRING_READY:
-                    output = processServiceCommand(appUser, text);
-                    break;
-                case WAIT_FOR_SEARCH_INPUT_QUERY:
+                case BASIC_STATE, CV_UPLOADED, SEARCH_STRING_READY -> output = processServiceCommand(appUser, text);
+                case WAIT_FOR_SEARCH_INPUT_QUERY -> {
                     if (text.length() > 0) {
                         SEARCH_QUERY = text.replace(" ", "%20");
                     } else {
@@ -92,23 +89,20 @@ public class MainServiceImpl implements MainService {
                     appUser.setState(WAIT_FOR_SEARCH_INPUT_LOCATION);
                     appUserRepository.save(appUser);
                     output = "Введите регион поиска";
-                    break;
-                case WAIT_FOR_SEARCH_INPUT_LOCATION:
+                }
+                case WAIT_FOR_SEARCH_INPUT_LOCATION -> {
                     LOCATION = text;
                     appUser.setState(SEARCH_STRING_READY);
                     appUserRepository.save(appUser);
                     output = "Теперь нажмите /download";
-                    break;
-                case WAIT_FOR_EMAIL_STATE:
-                    output = appUserService.setEmail(appUser, text);
-                    break;
-                case WAIT_FOR_CV:
-                    output = "Загрузите ваше резюме в Телеграм Бот в формате docx, docs, txt. " +
-                            "Для отмены введите /cancel ";
-                    break;
-                default:
+                }
+                case WAIT_FOR_EMAIL_STATE -> output = appUserService.setEmail(appUser, text);
+                case WAIT_FOR_CV -> output = "Загрузите ваше резюме в Телеграм Бот в формате docx, docs, txt. " +
+                        "Для отмены введите /cancel ";
+                default -> {
                     log.error("Unknown user state: " + userState);
                     output = "Неизвестная ошибка! Введите /cancel и попробуйте снова!";
+                }
             }
         }
         sendAnswer(output, chatId);
@@ -119,28 +113,23 @@ public class MainServiceImpl implements MainService {
         saveRawData(update);
         var appUser = findOrSaveAppUser(update);
         var chatId = update.getMessage().getChatId();
-        if (appUser.getState().equals(WAIT_FOR_CV)) {
-            appUser.setState(BASIC_STATE);
-            appUserRepository.save(appUser);
-            if (isNotAllowedToSendContent(chatId, appUser)) {
-                return;
-            }
-            try {
-                AppDocument doc = fileService.processDoc(update.getMessage(), appUser);
+        if (isNotAllowedToSendContent(chatId, appUser)) {
+            return;
+        }
+        appUser.setState(CV_UPLOADED);
+        appUserRepository.save(appUser);
+        try {
+            AppDocument doc = fileService.processDoc(update.getMessage(), appUser);
 //              String link = fileService.generateLink(doc.getId(), LinkType.GET_DOC);
 //            var answer = "Документ успешно загружен! "
 //                    + " Ссылка для скачивания: " + link;
-                var answer = "Ваше резюме успешно загружено, теперь, можете перейти к следующему шагу" +
-                        " и скачать вакансии /download";
-                sendAnswer(answer, chatId);
-            } catch (UploadFileException exp) {
-                log.error(String.valueOf(exp));
-                String error = "К сожалению, загрузка файла не удалась. Повторите попытку позже";
-                sendAnswer(error, chatId);
-            }
-        } else {
-            var answer = "Для загрузки документов нажмите /upload_resume";
+            var answer = "Ваше резюме успешно загружено, теперь, можете перейти к следующему шагу" +
+                    " и скачать вакансии /download";
             sendAnswer(answer, chatId);
+        } catch (UploadFileException exp) {
+            log.error(String.valueOf(exp));
+            String error = "К сожалению, загрузка файла не удалась. Повторите попытку позже";
+            sendAnswer(error, chatId);
         }
     }
 
@@ -171,8 +160,9 @@ public class MainServiceImpl implements MainService {
             var error = "Зарегистрируйтесь или активируйте свою учетную запись для загрузки контента.";
             sendAnswer(error, chatId);
             return true;
-        } else if (!BASIC_STATE.equals(userState)) {
-            var error = "Отмените текущую команду с помощью /cancel для отправки файлов";
+        } else if (!WAIT_FOR_CV.equals(userState)) {
+            var error = "Для загрузки документов нажмите /upload_resume";
+//            var error = "Отмените текущую команду с помощью /cancel для отправки файлов";
             sendAnswer(error, chatId);
             return true;
         }
@@ -205,15 +195,22 @@ public class MainServiceImpl implements MainService {
             case REGISTRATION -> appUserService.registerUser(appUser);
             case HELP -> help();
             case UPLOAD_CV -> {
-                appUser.setState(WAIT_FOR_CV);
-                appUserRepository.save(appUser);
-                yield "Загрузите ваше резюме в формате docx, doc, txt в Телеграм бот";
+                if (!appUser.getState().equals(CV_UPLOADED)) {
+                    appUser.setState(WAIT_FOR_CV);
+                    appUserRepository.save(appUser);
+                    yield "Загрузите ваше резюме в формате docx, doc, txt в Телеграм бот";
+                }
+                yield "Вы уже загрузили одно резюме. Теперь можно только обновить: /update";
             }
-            case START -> "Приветствую! Для того чтобы начать использовать бот, необходимо набрать: /registration " +
-                    "Чтобы посмотреть список доступных команд введите /help";
+            case START ->
+                    "Приветствую! Это Бот на базе AI ChatGPT. Он собирает вакансии, фильтрует те, которые подходят" +
+                            " под ваше резюме, пишет сопроводительные письма под вакансии, которые подошли вам, " +
+                            "а также, дает рекомендации, на основе найденных вакансий, что можно улучшить в вашем резюме." +
+                            " Для того чтобы начать использовать бот, необходимо регистрация: /registration " +
+                            " Чтобы посмотреть список доступных команд введите /help";
             case DOWNLOAD_JOBS -> {
                 if (appUser.getIsActive()) {
-                    if (appUser.getState().equals(BASIC_STATE)) {
+                    if (appUser.getState().equals(BASIC_STATE) || appUser.getState().equals(CV_UPLOADED)) {
                         appUser.setState(WAIT_FOR_SEARCH_INPUT_QUERY);
                         appUserRepository.save(appUser);
                         yield "Введите название вакансии";
@@ -244,12 +241,17 @@ public class MainServiceImpl implements MainService {
             case SHOW_MATCHED -> appUser.getIsActive() ? jobService.showMatchedJobs(appUser) : defaultResponse();
             case GENERATE_AND_SEND ->
                     appUser.getIsActive() ? jobService.generateCoversAndSendAsAttachment(appUser) : defaultResponse();
+            case UPDATE, SUGGEST_IMPROVE -> underConstruction();
             default -> defaultResponse();
         };
     }
 
+    private String underConstruction() {
+        return "Under construction";
+    }
+
     private String defaultResponse() {
-//              Backdoor to talk to ChatGPT
+        //  Backdoor to talk to ChatGPT
 //              return openAIService.chatGPTRequestSessionBased(cmd);
         return "Вы не зарегистрированы! Чтобы начать использование бота зарегистрируйтесь: /registration " +
                 "Иначе вы ввели неизвестную команду! Чтобы посмотреть список доступных команд введите /help " +

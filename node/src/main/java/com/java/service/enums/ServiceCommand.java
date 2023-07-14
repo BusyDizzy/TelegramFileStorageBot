@@ -8,15 +8,19 @@ public enum ServiceCommand {
 
     UPLOAD_CV("/upload_resume"),
 
-    DOWNLOAD_JOBS("/download"),
+    DOWNLOAD_JOBS("/download_jobs"),
 
-    SHOW_DOWNLOADED("/show_downloaded"),
+    SHOW_DOWNLOADED("/show_downloaded_jobs"),
 
     MATCH("/match"),
 
     SHOW_MATCHED("/show_matched"),
 
-    GENERATE_AND_SEND("/generate"),
+    GENERATE_AND_SEND("/generate_cover"),
+
+    SUGGEST_IMPROVE("/suggest_improvements"),
+
+    UPDATE("/update_resume"),
     HELP("/help"),
     CANCEL("/cancel"),
 

@@ -1,26 +1,22 @@
 package com.java.service.impl;
 
+import com.java.DTO.CurriculumVitaeDTO;
 import com.java.DTO.JobListingDTO;
 import com.java.client.JobClient;
 import com.java.entity.AppUser;
-import com.java.entity.CurriculumVitae;
 import com.java.entity.JobListing;
 import com.java.entity.enums.JobMatchState;
-import com.java.repository.CurriculumVitaeRepository;
+import com.java.repository.CurriculumVitaeDTORepository;
 import com.java.repository.JobListingDTORepository;
 import com.java.repository.JobListingRepository;
 import com.java.service.AppUserService;
 import com.java.service.JobService;
 import com.java.service.OpenAIService;
-import com.java.service.UrlShortener;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
@@ -36,7 +32,7 @@ public class JobServiceImpl implements JobService {
 
     private final JobListingDTORepository jobListingDTORepository;
 
-    private final CurriculumVitaeRepository curriculumVitaeRepository;
+    private final CurriculumVitaeDTORepository curriculumVitaeRepository;
 
     private static final String EMAIL_PREFIX = "На вашу почту %s были отправлены письма на следующие вакансии: \n";
     private static final String PROMPT_MESSAGE_FOR_COVER_GENERATION = "Accumulate my CV first. " +
@@ -61,7 +57,7 @@ public class JobServiceImpl implements JobService {
     public JobServiceImpl(OpenAIServiceImpl openAIServiceImpl,
                           JobListingRepository jobListingRepository,
                           JobListingDTORepository jobListingDTORepository,
-                          CurriculumVitaeRepository curriculumVitaeRepository,
+                          CurriculumVitaeDTORepository curriculumVitaeRepository,
                           AppUserService appUserService, JobClient jobClient) {
         this.openAIService = openAIServiceImpl;
         this.jobListingRepository = jobListingRepository;
@@ -83,22 +79,28 @@ public class JobServiceImpl implements JobService {
         List<JobListingDTO> filteredJobs = new ArrayList<>(jobListingDTOS);
         log.info("Начинаем анализ {} вакансий с заданным порогом совпадения {} %", jobListingDTOS.size(), matchPercentage);
         // TODO Заменить на новый репозиторий как будет
-        CurriculumVitae curriculumVitae = curriculumVitaeRepository.findByIdWithJobExperiences(appUser.getId());
+        Optional<CurriculumVitaeDTO> curriculumVitae = curriculumVitaeRepository.findByUserId(appUser.getId());
         for (JobListingDTO job : jobListingDTOS) {
             StringBuilder promptToCalculateJobMatchingRate = new StringBuilder();
-            buildPromptForChatGPTForUserData(promptToCalculateJobMatchingRate,
-                    PROMPT_MESSAGE_FOR_JOB_MATCHER,
-                    curriculumVitae);
-            buildPromptForChatGPTForJobListingDTO(promptToCalculateJobMatchingRate, job);
-            Double jobMatchValue = openAIService.
-                    chatGPTRequestMemoryLessSingle(promptToCalculateJobMatchingRate.toString());
-            if (jobMatchValue <= userMatchValue) {
-                job.setJobMatchState(JobMatchState.NOT_MATCH);
-                jobListingDTORepository.save(job);
-                filteredJobs.remove(job);
+            if (curriculumVitae.isPresent()) {
+                buildPromptForChatGPTForUserData(promptToCalculateJobMatchingRate,
+                        PROMPT_MESSAGE_FOR_JOB_MATCHER,
+                        curriculumVitae.get());
             } else {
-                job.setJobMatchState(JobMatchState.MATCH);
-                jobListingDTORepository.save(job);
+                return Collections.emptyList();
+            }
+            buildPromptForChatGPTForJobListingDTO(promptToCalculateJobMatchingRate, job);
+            if (job.getJobMatchState().equals(JobMatchState.NOT_EVALUATED)) {
+                Double jobMatchValue = openAIService.
+                        chatGPTRequestMemoryLessSingle(promptToCalculateJobMatchingRate.toString());
+                if (jobMatchValue <= userMatchValue) {
+                    job.setJobMatchState(JobMatchState.NOT_MATCH);
+                    jobListingDTORepository.save(job);
+                    filteredJobs.remove(job);
+                } else {
+                    job.setJobMatchState(JobMatchState.MATCH);
+                    jobListingDTORepository.save(job);
+                }
             }
         }
         log.info("Подобрано {} вакансий с заданным порогом совпадения {} %", filteredJobs.size(), matchPercentage);
@@ -122,6 +124,7 @@ public class JobServiceImpl implements JobService {
 
         // If generated try to send them all in one email as attachments
         try {
+            assert listCompletableFuture != null;
             appUserService.sendMultipleCoverLetters(appUser, listCompletableFuture.get());
         } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
@@ -161,11 +164,14 @@ public class JobServiceImpl implements JobService {
                     answerForCover = "Yes";
                 }
                 String messageString = String.format(
-                        "Company: %s \n" +
-                                "Job Title: %s \n" +
-                                "Match: %s \n" +
-                                "Cover sent: %s \n" +
-                                "Link: %s \n \n",
+                        """
+                                Company: %s\s
+                                Job Title: %s\s
+                                Match: %s\s
+                                Cover sent: %s\s
+                                Link: %s\s
+                                \s
+                                """,
                         job.getCompanyName(),
                         job.getJobTitle(),
                         answerForMatch,
@@ -178,14 +184,18 @@ public class JobServiceImpl implements JobService {
 
 
     private CompletableFuture<List<String>> generateCoverLetters(AppUser appUser, List<JobListingDTO> jobList) {
-        CurriculumVitae curriculumVitae = curriculumVitaeRepository.findByIdWithJobExperiences(appUser.getId());
+        Optional<CurriculumVitaeDTO> curriculumVitae = curriculumVitaeRepository.findById(appUser.getId());
         List<CompletableFuture<String>> coverLetterFutures = new ArrayList<>();
 
         for (JobListingDTO job : jobList) {
             StringBuilder promptToGenerateCoverLetter = new StringBuilder();
-            buildPromptForChatGPTForUserData(promptToGenerateCoverLetter,
-                    PROMPT_MESSAGE_FOR_COVER_GENERATION,
-                    curriculumVitae);
+            if (curriculumVitae.isPresent()) {
+                buildPromptForChatGPTForUserData(promptToGenerateCoverLetter,
+                        PROMPT_MESSAGE_FOR_COVER_GENERATION,
+                        curriculumVitae.get());
+            } else {
+                return null;
+            }
             buildPromptForChatGPTForJobListingDTO(promptToGenerateCoverLetter, job);
 
             CompletableFuture<String> coverLetterFuture = openAIService.
@@ -208,16 +218,23 @@ public class JobServiceImpl implements JobService {
     }
 
 
+//    private void buildPromptForChatGPTForUserData(StringBuilder promptToGenerateCoverLetter, String initializationPrompt,
+//                                                  CurriculumVitae curriculumVitae) {
+//        promptToGenerateCoverLetter
+//                .append(initializationPrompt).append("Here goes my CV: ")
+//                .append(replaceSymbolsWithSpaces(curriculumVitae.getFullName())).append(" ")
+//                .append(replaceSymbolsWithSpaces(curriculumVitae.getSummaryObjective())).append(" ")
+//                .append(replaceSymbolsWithSpaces(curriculumVitae.getSoftSkills())).append(" ")
+//                .append(replaceSymbolsWithSpaces(curriculumVitae.getHardSkills())).append(" ")
+//                .append(replaceSymbolsWithSpaces(curriculumVitae.getJobExperience().toString())).append(" ")
+//                .append(replaceSymbolsWithSpaces(curriculumVitae.getEducationHistory())).append(" ");
+//    }
+
     private void buildPromptForChatGPTForUserData(StringBuilder promptToGenerateCoverLetter, String initializationPrompt,
-                                                  CurriculumVitae curriculumVitae) {
+                                                  CurriculumVitaeDTO curriculumVitae) {
         promptToGenerateCoverLetter
                 .append(initializationPrompt).append("Here goes my CV: ")
-                .append(replaceSymbolsWithSpaces(curriculumVitae.getFullName())).append(" ")
-                .append(replaceSymbolsWithSpaces(curriculumVitae.getSummaryObjective())).append(" ")
-                .append(replaceSymbolsWithSpaces(curriculumVitae.getSoftSkills())).append(" ")
-                .append(replaceSymbolsWithSpaces(curriculumVitae.getHardSkills())).append(" ")
-                .append(replaceSymbolsWithSpaces(curriculumVitae.getJobExperience().toString())).append(" ")
-                .append(replaceSymbolsWithSpaces(curriculumVitae.getEducationHistory())).append(" ");
+                .append(replaceSymbolsWithSpaces(curriculumVitae.getCvDescription()));
     }
 
     private void buildPromptForChatGPTForJobListing(StringBuilder jobDescription, JobListing job) {
@@ -240,6 +257,6 @@ public class JobServiceImpl implements JobService {
     }
 
     public String replaceSymbolsWithSpaces(String text) {
-        return text.replaceAll("[/\\\\\\-()'\"<>*]", " ");
+        return text.replaceAll("[^a-zA-Z0-9 ]", "");
     }
 }

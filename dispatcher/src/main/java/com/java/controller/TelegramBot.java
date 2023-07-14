@@ -51,12 +51,12 @@ public class TelegramBot extends TelegramWebhookBot {
             menu.add(new BotCommand("/start", "Welcome message"));
             menu.add(new BotCommand("/registration", "Register to start"));
             menu.add(new BotCommand("/upload_resume", "Upload your cv"));
-            menu.add(new BotCommand("/download", "Download jobs from LinkedIn(now)"));
-            menu.add(new BotCommand("/show_downloaded", "Show all jobs in database"));
+            menu.add(new BotCommand("/download_jobs", "Download jobs from LinkedIn(now)"));
+            menu.add(new BotCommand("/show_downloaded_jobs", "Show all jobs in database"));
             menu.add(new BotCommand("/match", "Match you CV to jobs in database with defined rate"));
             menu.add(new BotCommand("/show_matched", "Shows jobs jobs that match you CV"));
-            menu.add(new BotCommand("/generate", "Generate covers for matched jobs and sends by email"));
-            menu.add(new BotCommand("/improve_resume", "Suggest improvements for CV"));
+            menu.add(new BotCommand("/generate_cover", "Generate covers for matched jobs and sends by email"));
+            menu.add(new BotCommand("/suggest_improvements", "Suggest improvements for CV"));
             menu.add(new BotCommand("/update_resume", "Upload updated cv"));
             menu.add(new BotCommand("/help", "Info how to use this bot"));
             menu.add(new BotCommand("/cancel", "Cancel your request"));

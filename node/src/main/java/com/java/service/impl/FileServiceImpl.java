@@ -64,6 +64,7 @@ public class FileServiceImpl implements FileService {
         ResponseEntity<String> response = getFilePath(fileId);
         if (response.getStatusCode() == HttpStatus.OK) {
             BinaryContent persistentBinaryContent = getPersistentBinaryContent(response);
+            // Parsing CV here
             cvParsingService.parseAndSaveCv(persistentBinaryContent.getFileAsArrayOfBytes(), appUser);
             AppDocument transientAppDoc = buildTransientAppDoc(telegramDoc, persistentBinaryContent);
             return appDocumentRepository.save(transientAppDoc);

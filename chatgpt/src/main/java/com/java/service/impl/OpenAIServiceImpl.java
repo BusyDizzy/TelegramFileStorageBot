@@ -2,6 +2,7 @@ package com.java.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.java.exception.ChatGPTException;
 import com.java.model.AssistantMessage;
 import com.java.model.MessageRole;
 import com.java.service.OpenAIService;
@@ -11,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
@@ -64,9 +66,10 @@ public class OpenAIServiceImpl implements OpenAIService {
     @Override
     public Double chatGPTRequestMemoryLessSingle(String message) {
         // Create the stateless request body as a JSON string
+        String sanitizedMessage = sanitizeMessage(message);
         String requestBody =
                 String.format("{\"model\":\"%s\",\"messages\":[{\"role\":\"user\",\"content\":\"%s\"}]}",
-                        model, message);
+                        model, sanitizedMessage);
         Double jobRate = null;
         try {
             jobRate = Double.parseDouble(sendMessageToChatGPT(requestBody));
@@ -77,24 +80,27 @@ public class OpenAIServiceImpl implements OpenAIService {
         return jobRate;
     }
 
-    private String sendMessageToChatGPT(String requestBody) {
+    private String sendMessageToChatGPT(String requestBody) throws ChatGPTException {
         // Create headers with Content-Type and Authorization
         HttpHeaders headers = setHeaders();
 
         // Create the request entity with headers and body
         HttpEntity<String> requestEntity = new HttpEntity<>(requestBody, headers);
 
-        log.info("Sending the POST request to ChatGPT");
-        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
+        try {
+            log.info("Sending the POST request to ChatGPT");
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
 
-        // Check the response status
-        if (response.getStatusCode() == HttpStatus.OK) {
+            // Check the response status
+            if (response.getStatusCode() != HttpStatus.OK) {
+                throw new ChatGPTException("ChatGPT request failed with status: " + response.getStatusCode());
+            }
+
             log.info("Extracting chatGPT answer");
             return extractContentFromResponse(response);
-        } else {
-            log.info("Request failed with status: {}", response.getStatusCode());
+        } catch (RestClientException e) {
+            throw new ChatGPTException("Error communicating with ChatGPT: " + e.getMessage());
         }
-        return "Sorry something went wrong...";
     }
 
 
@@ -139,6 +145,16 @@ public class OpenAIServiceImpl implements OpenAIService {
             e.printStackTrace();
             return null;
         }
+    }
+
+    private String sanitizeMessage(String message) {
+        return message
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t")
+                .replace("'", "\\'");
     }
 }
 

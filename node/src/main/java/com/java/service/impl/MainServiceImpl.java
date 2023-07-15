@@ -2,15 +2,14 @@ package com.java.service.impl;
 
 import com.java.DTO.JobListingDTO;
 import com.java.entity.AppDocument;
-import com.java.entity.AppPhoto;
 import com.java.entity.AppUser;
 import com.java.entity.RawData;
 import com.java.entity.enums.UserState;
+import com.java.exception.ChatGPTException;
 import com.java.exceptions.UploadFileException;
 import com.java.repository.AppUserRepository;
 import com.java.repository.RawDataRepository;
 import com.java.service.*;
-import com.java.service.enums.LinkType;
 import com.java.service.enums.ServiceCommand;
 import com.java.service.fetching.LinkedInLocationService;
 import lombok.extern.slf4j.Slf4j;
@@ -69,102 +68,109 @@ public class MainServiceImpl implements MainService {
     }
 
     @Override
-    public void processTextMessage(Update update) {
+    public boolean processTextMessage(Update update) {
         saveRawData(update);
         var appUser = findOrSaveAppUser(update);
         UserState userState = appUser.getState();
         var chatId = update.getMessage().getChatId();
         var text = update.getMessage().getText();
         ServiceCommand serviceCommand = ServiceCommand.fromValue(text);
-
         String output;
-
-        if (serviceCommand == ServiceCommand.CANCEL) {
-            output = cancelProcess(appUser);
-        } else {
-            switch (userState) {
-                case BASIC_STATE, SEARCH_STRING_READY -> output = processServiceCommand(appUser, text);
-                case WAIT_FOR_SEARCH_INPUT_QUERY -> {
-                    if (text.length() > 0) {
-                        SEARCH_QUERY = text.replace(" ", "%20");
-                    } else {
-                        SEARCH_QUERY = text;
-                    }
-                    appUser.setState(WAIT_FOR_SEARCH_INPUT_LOCATION);
-                    appUserRepository.save(appUser);
-                    output = "Введите регион поиска";
-                }
-                case WAIT_FOR_SEARCH_INPUT_LOCATION -> {
-                    LOCATION = text;
-                    // Checking if LinkedIn geoId is supported (stored in db)
-                    if (linkedInLocationService.getGeoIdByLocationName(text).isEmpty()) {
-                        output = "Поиск по данному региону пока не поддерживается. " +
-                                "Просьба связаться с разработчиком: anton.tk@gmail.com";
-                        appUser.setState(BASIC_STATE);
+        try {
+            if (serviceCommand == ServiceCommand.CANCEL) {
+                output = cancelProcess(appUser);
+            } else {
+                switch (userState) {
+                    case BASIC_STATE, SEARCH_STRING_READY -> output = processServiceCommand(appUser, text);
+                    case WAIT_FOR_SEARCH_INPUT_QUERY -> {
+                        if (text.length() > 0) {
+                            SEARCH_QUERY = text.replace(" ", "%20");
+                        } else {
+                            SEARCH_QUERY = text;
+                        }
+                        appUser.setState(WAIT_FOR_SEARCH_INPUT_LOCATION);
                         appUserRepository.save(appUser);
-                        break;
+                        output = "Введите регион поиска";
                     }
-                    appUser.setState(SEARCH_STRING_READY);
-                    appUserRepository.save(appUser);
-                    output = "Теперь нажмите /download";
-                }
-                case WAIT_FOR_EMAIL_STATE -> output = appUserService.setEmail(appUser, text);
-                case WAIT_FOR_CV -> output = "Загрузите ваше резюме в Телеграм Бот в формате docx, docs, txt. " +
-                        "Для отмены введите /cancel ";
-                default -> {
-                    log.error("Unknown user state: " + userState);
-                    output = "Неизвестная ошибка! Введите /cancel и попробуйте снова!";
+                    case WAIT_FOR_SEARCH_INPUT_LOCATION -> {
+                        LOCATION = text;
+                        // Checking if LinkedIn geoId is supported (stored in db)
+                        if (linkedInLocationService.getGeoIdByLocationName(text).isEmpty()) {
+                            output = "Поиск по данному региону пока не поддерживается. " +
+                                    "Просьба связаться с разработчиком: anton.tk@gmail.com";
+                            appUser.setState(BASIC_STATE);
+                            appUserRepository.save(appUser);
+                            break;
+                        }
+                        appUser.setState(SEARCH_STRING_READY);
+                        appUserRepository.save(appUser);
+                        output = "Теперь нажмите /download";
+                    }
+                    case WAIT_FOR_EMAIL_STATE -> output = appUserService.setEmail(appUser, text);
+                    case WAIT_FOR_CV -> output = "Загрузите ваше резюме в Телеграм Бот в формате docx, docs, txt. " +
+                            "Для отмены загрузки резюме введите /cancel ";
+                    default -> {
+                        log.error("Unknown user state: " + userState);
+                        output = "Неизвестная ошибка! Введите /cancel и попробуйте снова!";
+                    }
                 }
             }
+            sendAnswer(output, chatId);
+            return true;
+        } catch (ChatGPTException e) {
+            log.error("ChatGPTException occurred while processing text message {}", e.getMessage());
+            // Do specific handling for ChatGPTException here
+            output = "Ошибка во время обработки сообщения в ChatGPT, обратитесь к разработчику TG: @AntonTkatch";
+            sendAnswer(output, chatId);
+            return false;
+        } catch (Exception e) {
+            log.error("Error processing text message {}", e.getMessage());
+            output = "Ошибка во время обработки команды, обратитесь к разработчику TG: @AntonTkatch";
+            sendAnswer(output, chatId);
+            return false;
         }
-        sendAnswer(output, chatId);
     }
 
     @Override
-    public void processDocMessage(Update update) {
+    public boolean processDocMessage(Update update) {
         saveRawData(update);
         var appUser = findOrSaveAppUser(update);
         var chatId = update.getMessage().getChatId();
-        if (isNotAllowedToSendContent(chatId, appUser)) {
-            return;
-        }
-        appUser.setState(BASIC_STATE);
-        appUserRepository.save(appUser);
         try {
-            AppDocument doc = fileService.processDoc(update.getMessage(), appUser);
+            if (isNotAllowedToSendContent(chatId, appUser)) {
+                return false;
+            }
+
+            appUser.setState(BASIC_STATE);
+            appUserRepository.save(appUser);
+            try {
+                AppDocument doc = fileService.processDoc(update.getMessage(), appUser);
 //              String link = fileService.generateLink(doc.getId(), LinkType.GET_DOC);
 //            var answer = "Документ успешно загружен! "
 //                    + " Ссылка для скачивания: " + link;
-            var answer = "Ваше резюме успешно загружено, теперь, можете перейти к следующему шагу" +
-                    " и скачать вакансии /download_jobs";
-            sendAnswer(answer, chatId);
-        } catch (UploadFileException exp) {
-            log.error(String.valueOf(exp));
-            String error = "К сожалению, загрузка файла не удалась. Повторите попытку позже";
+                if (doc != null) {
+                    var answer = "Ваше резюме успешно загружено, теперь, можете перейти к следующему шагу" +
+                            " и скачать вакансии /download_jobs";
+                    sendAnswer(answer, chatId);
+                    return true;
+                }
+                // TODO Поправить метод
+                else {
+                    throw new UploadFileException("Something went wrong");
+                }
+            } catch (UploadFileException exp) {
+                log.error(String.valueOf(exp));
+                String error = "К сожалению, загрузка файла не удалась. Повторите попытку позже";
+                sendAnswer(error, chatId);
+                return false;
+            }
+        } catch (Exception e) {
+            String error = "К сожалению, произошла ошибка, обратитесь к разработчику TG: @AntonTkatch";
             sendAnswer(error, chatId);
+            return false;
         }
     }
 
-    @Override
-    public void processPhotoMessage(Update update) {
-        saveRawData(update);
-        var appUser = findOrSaveAppUser(update);
-        var chatId = update.getMessage().getChatId();
-
-        if (isNotAllowedToSendContent(chatId, appUser)) {
-            return;
-        }
-        try {
-            AppPhoto photo = fileService.processPhoto(update.getMessage());
-            String link = fileService.generateLink(photo.getId(), LinkType.GET_PHOTO);
-            var answer = "Фото успешно загружено! Ссылка для скачивания: " + link;
-            sendAnswer(answer, chatId);
-        } catch (UploadFileException exp) {
-            log.error(String.valueOf(exp));
-            String error = "К сожалению, загрузка фото не удалась. Повторите попытку позже";
-            sendAnswer(error, chatId);
-        }
-    }
 
     private boolean isNotAllowedToSendContent(Long chatId, AppUser appUser) {
         var userState = appUser.getState();

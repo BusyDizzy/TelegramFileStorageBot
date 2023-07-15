@@ -47,9 +47,7 @@ public class UpdateProcessor {
             processTextMessage(update);
         } else if (message.hasDocument()) {
             processDocMessage(update);
-        } else if (message.hasPhoto()) {
-            processPhotoMessage(update);
-        } else {
+        }  else {
             setUnsupportedMessageTypeView(update);
         }
     }
@@ -68,11 +66,6 @@ public class UpdateProcessor {
 
     public void setView(SendMessage sendMessage) {
         telegramBot.sendAnswerMessage(sendMessage);
-    }
-
-    private void processPhotoMessage(Update update) {
-        updateProducer.produce(PHOTO_MESSAGE_UPDATE, update);
-        setFileIsReceivedView(update);
     }
 
     private void processDocMessage(Update update) {

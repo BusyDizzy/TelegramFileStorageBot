@@ -104,6 +104,9 @@ public class JobServiceImpl implements JobService {
                     jobListingDTORepository.save(job);
                 }
             }
+            else {
+                filteredJobs.remove(job);
+            }
         }
         log.info("Подобрано {} вакансий с заданным порогом совпадения {} %", filteredJobs.size(), matchPercentage);
         return filteredJobs;

@@ -64,14 +64,15 @@ public class OpenAIServiceImpl implements OpenAIService {
     }
 
     @Override
-    public Double chatGPTRequestMemoryLessSingle(String message) {
-        // Create the stateless request body as a JSON string
-        String sanitizedMessage = sanitizeMessage(message);
-        String requestBody =
-                String.format("{\"model\":\"%s\",\"messages\":[{\"role\":\"user\",\"content\":\"%s\"}]}",
-                        model, sanitizedMessage);
+    public Double calculateMatchRateForCvAndJob(String message) {
         Double jobRate = null;
         try {
+            // Create the stateless request body as a JSON string
+            String sanitizedMessage = sanitizeMessage(message);
+            String requestBody =
+                    String.format("{\"model\":\"%s\",\"messages\":[{\"role\":\"user\",\"content\":\"%s\"}]}",
+                            model, sanitizedMessage);
+            log.info("Message for ChatGPT was build");
             jobRate = Double.parseDouble(sendMessageToChatGPT(requestBody));
             Thread.sleep(DELAY_BETWEEN_REQUESTS);
         } catch (Exception e) {
@@ -79,6 +80,43 @@ public class OpenAIServiceImpl implements OpenAIService {
         }
         return jobRate;
     }
+
+    @Override
+    public String simpleSessionLessRequest(String message) {
+        // Create the stateless request body as a JSON string
+        String sanitizedMessage = sanitizeMessage(message);
+        String requestBody =
+                String.format("{\"model\":\"%s\",\"messages\":[{\"role\":\"user\",\"content\":\"%s\"}]}",
+                        model, sanitizedMessage);
+        log.info("Message for ChatGPT was build");
+        return sendMessageToChatGPT(requestBody);
+    }
+
+//    public Double calculateMatchRateForCvAndJob(String message) {
+//        int attempts = 3;
+//        double totalJobRate = 0;
+//        int successfulAttempts = 0;
+//
+//        for (int i = 0; i < attempts; i++) {
+//            try {
+//                // Create the stateless request body as a JSON string
+//                String sanitizedMessage = sanitizeMessage(message);
+//                String requestBody =
+//                        String.format("{\"model\":\"%s\",\"messages\":[{\"role\":\"user\",\"content\":\"%s\"}]}",
+//                                model, sanitizedMessage);
+//                log.info("Message for ChatGPT was build");
+//                double currentJobRate = Double.parseDouble(sendMessageToChatGPT(requestBody));
+//                totalJobRate += currentJobRate;
+//                successfulAttempts++;
+//                Thread.sleep(DELAY_BETWEEN_REQUESTS);
+//            } catch (Exception e) {
+//                log.error("ChatGPT returned not a value for some reason", e);
+//                // In case of exception we retry
+//            }
+//        }
+//
+//        return successfulAttempts > 0 ? totalJobRate / successfulAttempts : null;
+//    }
 
     private String sendMessageToChatGPT(String requestBody) throws ChatGPTException {
         // Create headers with Content-Type and Authorization
@@ -147,14 +185,23 @@ public class OpenAIServiceImpl implements OpenAIService {
         }
     }
 
-    private String sanitizeMessage(String message) {
-        return message
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t")
-                .replace("'", "\\'");
+    //    private String sanitizeMessage(String message) {
+//        return message
+//                .replace("\\", "\\\\")
+//                .replace("\"", "\\\"")
+//                .replace("\n", "\\n")
+//                .replace("\r", "\\r")
+//                .replace("\t", "\\t")
+//                .replace("'", "\\'");
+//    }
+//    public static String sanitizeMessage(String text) {
+//        String pattern = "[^a-zA-Z0-9\\s,.+\\-?!@]";
+//        String cleanText = text.replaceAll(pattern, " ");
+//        return cleanText;
+//    }
+
+    public String sanitizeMessage(String text) {
+        return text.replaceAll("[^a-zA-Z0-9 ]", " ");
     }
 }
 

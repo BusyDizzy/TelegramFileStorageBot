@@ -4,6 +4,7 @@ import com.java.DTO.JobListingDTO;
 import com.java.entity.AppDocument;
 import com.java.entity.AppUser;
 import com.java.entity.RawData;
+import com.java.entity.enums.Role;
 import com.java.entity.enums.UserState;
 import com.java.exception.ChatGPTException;
 import com.java.exceptions.UploadFileException;
@@ -19,7 +20,6 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
 
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -81,7 +81,7 @@ public class MainServiceImpl implements MainService {
                 output = cancelProcess(appUser);
             } else {
                 switch (userState) {
-                    case BASIC_STATE, SEARCH_STRING_READY -> output = processServiceCommand(appUser, text);
+                    case BASIC_STATE, SEARCH_STRING_READY -> output = processServiceCommand(appUser, text, chatId);
                     case WAIT_FOR_SEARCH_INPUT_QUERY -> {
                         if (text.length() > 0) {
                             SEARCH_QUERY = text.replace(" ", "%20");
@@ -207,7 +207,7 @@ public class MainServiceImpl implements MainService {
         }
     }
 
-    private String processServiceCommand(AppUser appUser, String cmd) {
+    private String processServiceCommand(AppUser appUser, String cmd, Long chatId) {
         var serviceCommand = ServiceCommand.fromValue(cmd);
         assert serviceCommand != null;
         return switch (serviceCommand) {
@@ -221,12 +221,13 @@ public class MainServiceImpl implements MainService {
                 }
                 yield "Вы уже загрузили одно резюме. Теперь можно только обновить: /update";
             }
-            case START ->
-                    "Приветствую! Это Бот на базе AI ChatGPT. Он собирает вакансии, фильтрует те, которые подходят" +
-                            " под ваше резюме, пишет сопроводительные письма под вакансии, которые подошли вам, " +
-                            "а также, дает рекомендации, на основе найденных вакансий, что можно улучшить в вашем резюме." +
-                            " Для того чтобы начать использовать бот, необходимо регистрация: /registration " +
-                            " Чтобы посмотреть список доступных команд введите /help";
+            case START -> "Вас приветствует AI CareerBooster! Telegram Bot с встроенным ИИ для:\n" +
+                    "\n" +
+                    " - Сбора подходящих вакансий по вашему резюме\n" +
+                    " - Написания и отправки на почту сопроводительных писем для выбранных вакансий\n" +
+                    " - Рекомендаций по улучшению резюме на основе найденных вакансий\n" +
+                    "\n" +
+                    "Для начала работы регистрируйтесь: /registration. ";
             case DOWNLOAD_JOBS -> {
                 if (appUser.getIsActive()) {
                     if (appUser.getState().equals(BASIC_STATE) || appUser.getState().equals(CV_UPLOADED)) {
@@ -234,6 +235,7 @@ public class MainServiceImpl implements MainService {
                         appUserRepository.save(appUser);
                         yield "Введите название вакансии";
                     } else if (appUser.getState().equals(SEARCH_STRING_READY)) {
+                        sendAnswer("Загрузка началась, это может занять некоторое время...", chatId);
                         appUser.setState(BASIC_STATE);
                         appUserRepository.save(appUser);
                         ResponseEntity<JobListingDTO[]> response = jobService.collectJobs(
@@ -248,19 +250,8 @@ public class MainServiceImpl implements MainService {
                 yield defaultResponse();
             }
             case SHOW_DOWNLOADED -> appUser.getIsActive() ? jobService.showDownloadedJobs(appUser) : defaultResponse();
-            case MATCH -> {
-                if (appUser.getIsCvUploaded()) {
-                    List<JobListingDTO> filteredJobs = jobService.matchJobs(appUser, USER_JOB_MATCH_RATE);
-                    if (filteredJobs.size() > 0) {
-                        yield String.format("Отфильтровано %d вакансий, подходящих вам с заданным рейтингом %d" +
-                                        " Нажмите /show_matched для просмотра результатов.",
-                                filteredJobs.size(), USER_JOB_MATCH_RATE);
-                    }
-                    yield "Вообще ничего не подходит, попробуйте понизить планку...";
-                } else {
-                    yield "Для начала работы с функционалом сравнения загрузите резюме /upload_resume";
-                }
-            }
+            case MATCH ->
+                    appUser.getIsActive() ? jobService.matchJobs(appUser, USER_JOB_MATCH_RATE) : defaultResponse();
             case SHOW_MATCHED -> appUser.getIsActive() ? jobService.showMatchedJobs(appUser) : defaultResponse();
             case GENERATE_AND_SEND -> {
                 if (appUser.getIsCvUploaded() && appUser.getIsActive()) {
@@ -271,6 +262,7 @@ public class MainServiceImpl implements MainService {
                 }
                 yield "Какая-то оказия случилась...";
             }
+            case HIDDEN -> appUser.getRoles().contains(Role.ADMIN) ? "Hi from Admin" : defaultResponse();
             case UPDATE, SUGGEST_IMPROVE -> underConstruction();
             default -> defaultResponse();
         };

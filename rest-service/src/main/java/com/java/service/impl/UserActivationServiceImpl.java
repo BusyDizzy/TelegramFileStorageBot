@@ -1,9 +1,12 @@
 package com.java.service.impl;
 
+import com.java.entity.enums.Role;
 import com.java.repository.AppUserRepository;
 import com.java.service.UserActivationService;
 import com.java.utils.CryptoTool;
 import org.springframework.stereotype.Service;
+
+import java.util.Collections;
 
 @Service
 public class UserActivationServiceImpl implements UserActivationService {
@@ -23,6 +26,11 @@ public class UserActivationServiceImpl implements UserActivationService {
         if (optional.isPresent()) {
             var user = optional.get();
             user.setIsActive(true);
+            if (user.getId() == 1) {
+                user.setRoles(Collections.singleton(Role.ADMIN));
+            } else {
+                user.setRoles(Collections.singleton(Role.USER));
+            }
             user.setIsCvUploaded(false);
             appUserRepository.save(user);
             return true;

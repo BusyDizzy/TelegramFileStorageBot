@@ -17,6 +17,7 @@ import org.springframework.web.client.RestTemplate;
 import javax.mail.internet.AddressException;
 import javax.mail.internet.InternetAddress;
 import java.util.List;
+import java.util.Objects;
 
 import static com.java.entity.enums.UserState.BASIC_STATE;
 import static com.java.entity.enums.UserState.WAIT_FOR_EMAIL_STATE;
@@ -75,6 +76,7 @@ public class AppUserServiceImpl implements AppUserService {
                 var msg = String.format("Отправка email на почту %s не удалась...", email);
                 log.error(msg);
                 appUser.setEmail(null);
+
                 appUserRepository.save(appUser);
                 return msg;
             }
@@ -157,7 +159,7 @@ public class AppUserServiceImpl implements AppUserService {
         pictureHeader.setContentLength(resource.contentLength());
         pictureHeader.setContentDisposition(ContentDisposition.builder("form-data")
                 .name("coverLetterFiles")
-                .filename(resource.getFilename())
+                .filename(Objects.requireNonNull(resource.getFilename()))
                 .build());
         return pictureHeader;
     }

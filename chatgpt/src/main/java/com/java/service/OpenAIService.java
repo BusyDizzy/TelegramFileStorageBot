@@ -7,5 +7,7 @@ public interface OpenAIService {
 
     CompletableFuture<String> chatGPTRequestMemoryLess(String message);
 
-    Double chatGPTRequestMemoryLessSingle(String message);
+    Double calculateMatchRateForCvAndJob(String message);
+
+    String simpleSessionLessRequest(String message);
 }

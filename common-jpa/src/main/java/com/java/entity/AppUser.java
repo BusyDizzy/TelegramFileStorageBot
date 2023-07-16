@@ -1,13 +1,21 @@
 package com.java.entity;
 
 import com.java.DTO.JobListingDTO;
+import com.java.entity.enums.Role;
 import com.java.entity.enums.UserState;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
+import org.springframework.util.CollectionUtils;
 
 import javax.persistence.*;
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 @Getter
 @Setter
@@ -37,6 +45,16 @@ public class AppUser {
     @Column(name = "is_cv_uploaded")
     private Boolean isCvUploaded;
 
+    @Enumerated(EnumType.STRING)
+    @CollectionTable(name = "user_role", joinColumns = @JoinColumn(name = "user_id"),
+            uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "role"}, name = "uk_user_role")})
+    @Column(name = "role")
+    @ElementCollection(fetch = FetchType.EAGER)
+    @BatchSize(size = 200)
+    @JoinColumn
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private Set<Role> roles;
+
     @OneToMany(mappedBy = "appUser", cascade = CascadeType.ALL)
     private List<CurriculumVitae> curriculumVitaeList;
 
@@ -46,12 +64,12 @@ public class AppUser {
     @OneToMany(mappedBy = "appUser", cascade = CascadeType.ALL)
     private List<AppDocument> appDocuments;
 
-    public void addDocument(AppDocument appDocument){
+    public void addDocument(AppDocument appDocument) {
         this.appDocuments.add(appDocument);
         appDocument.setAppUser(this);
     }
 
-    public void removeDocument(AppDocument appDocument){
+    public void removeDocument(AppDocument appDocument) {
         this.appDocuments.remove(appDocument);
         appDocument.setAppUser(null);
     }
@@ -75,4 +93,13 @@ public class AppUser {
         this.jobListingDTOList.remove(jobListingDTO);
         jobListingDTO.setAppUser(null);
     }
+
+    public void setRoles(Collection<Role> roles) {
+        this.roles = CollectionUtils.isEmpty(roles) ? EnumSet.noneOf(Role.class) : EnumSet.copyOf(roles);
+    }
+
+    public boolean hasRole(Role role) {
+        return roles != null && roles.contains(role);
+    }
+
 }

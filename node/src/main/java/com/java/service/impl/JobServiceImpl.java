@@ -4,8 +4,10 @@ import com.java.DTO.CurriculumVitaeDTO;
 import com.java.DTO.JobListingDTO;
 import com.java.client.JobClient;
 import com.java.entity.AppUser;
-import com.java.entity.JobListing;
+import com.java.entity.ChatGPTPrompt;
 import com.java.entity.enums.JobMatchState;
+import com.java.entity.enums.PromptType;
+import com.java.repository.ChatGPTPromptsRepository;
 import com.java.repository.CurriculumVitaeDTORepository;
 import com.java.repository.JobListingDTORepository;
 import com.java.repository.JobListingRepository;
@@ -35,22 +37,10 @@ public class JobServiceImpl implements JobService {
     private final CurriculumVitaeDTORepository curriculumVitaeRepository;
 
     private static final String EMAIL_PREFIX = "На вашу почту %s были отправлены письма на следующие вакансии: \n";
-    private static final String PROMPT_MESSAGE_FOR_COVER_GENERATION = "Accumulate my CV first. " +
-            "Than generate cover letter for the position below based on my CV. Do not pour water, " +
-            "be specific, provide three bullet points at once, why I am suitable for this job, the fourth point" +
-            " should be why I want to work in this company, generate something human: for example, this is " +
-            "my first bank in this country or I used the services of this company for several years and etc. " +
-            "If its recruiting agency skip this part. If there are signs that company is proud to work on " +
-            "a local market, tell about my desire to be a part of this country (where job is applicable). " +
-            "Provide at the beginning several reasons why you would like to work on this company, " +
-            "and then why I am a good fit. Use and apply The F-Shaped pattern for reading. Here goes my CV:";
 
-    private static final String PROMPT_MESSAGE_FOR_JOB_MATCHER = "I will provide CV and job description after that." +
-            "Calculate the fit rate in double from 0 to 1 how my CV relates to the job description below and return " +
-            " If in the job description years of experience are more than my years of experience set score immediately 0 " +
-            "without further calculations" +
-            " In response I expect only one digit from 0 to 1 without any explanations. ";
     private final AppUserService appUserService;
+
+    private final ChatGPTPromptsRepository promptsRepository;
 
     private List<JobListingDTO> currentDownloadedJobsList;
 
@@ -60,12 +50,13 @@ public class JobServiceImpl implements JobService {
                           JobListingRepository jobListingRepository,
                           JobListingDTORepository jobListingDTORepository,
                           CurriculumVitaeDTORepository curriculumVitaeRepository,
-                          AppUserService appUserService, JobClient jobClient) {
+                          AppUserService appUserService, ChatGPTPromptsRepository promptsRepository, JobClient jobClient) {
         this.openAIService = openAIServiceImpl;
         this.jobListingRepository = jobListingRepository;
         this.jobListingDTORepository = jobListingDTORepository;
         this.curriculumVitaeRepository = curriculumVitaeRepository;
         this.appUserService = appUserService;
+        this.promptsRepository = promptsRepository;
         this.jobClient = jobClient;
     }
 
@@ -75,10 +66,14 @@ public class JobServiceImpl implements JobService {
         return responseEntity;
     }
 
-    public List<JobListingDTO> matchJobs(AppUser appUser, int matchPercentage) {
+    public String matchJobs(AppUser appUser, int matchPercentage) {
+        String answer;
+        int counter = 0;
         List<JobListingDTO> jobListingDTOS = jobListingDTORepository.findByUserId(appUser.getId());
+        ChatGPTPrompt prompt = promptsRepository.findByPromptType(1L, PromptType.MATCH_CURRICULUM_VITAE);
+        String PROMPT_MESSAGE_FOR_JOB_MATCHER = prompt.getPrompt();
         double userMatchValue = matchPercentage / 100.0;
-        List<JobListingDTO> filteredJobs = new ArrayList<>(jobListingDTOS);
+        List<JobListingDTO> filteredJobs = new ArrayList<>();
         log.info("Начинаем анализ {} вакансий с заданным порогом совпадения {} %", jobListingDTOS.size(), matchPercentage);
         // TODO Заменить на новый репозиторий как будет
         Optional<CurriculumVitaeDTO> curriculumVitae = curriculumVitaeRepository.findByUserId(appUser.getId());
@@ -89,27 +84,41 @@ public class JobServiceImpl implements JobService {
                         PROMPT_MESSAGE_FOR_JOB_MATCHER,
                         curriculumVitae.get());
             } else {
-                return Collections.emptyList();
+                return "Пожалуйста загрузите резюме для начала использования функционала /upload_resume ";
             }
             buildPromptForChatGPTForJobListingDTO(promptToCalculateJobMatchingRate, job);
             if (job.getJobMatchState().equals(JobMatchState.NOT_EVALUATED)) {
-                Double jobMatchValue = openAIService.
-                        chatGPTRequestMemoryLessSingle(promptToCalculateJobMatchingRate.toString());
-                if (jobMatchValue <= userMatchValue) {
-                    job.setJobMatchState(JobMatchState.NOT_MATCH);
-                    jobListingDTORepository.save(job);
-                    filteredJobs.remove(job);
-                } else {
-                    job.setJobMatchState(JobMatchState.MATCH);
-                    jobListingDTORepository.save(job);
+                try {
+                    Double jobMatchValue = openAIService.calculateMatchRateForCvAndJob(promptToCalculateJobMatchingRate.toString());
+                    counter++;
+                    if (jobMatchValue >= userMatchValue) {
+                        job.setJobMatchState(JobMatchState.MATCH);
+                        filteredJobs.add(job);
+                    } else {
+                        job.setJobMatchState(JobMatchState.NOT_MATCH);
+                    }
+                } catch (NumberFormatException e) {
+                    log.error("Error occurred while calculating match rate for job: {}", job.getId());
+                    // Handle the error accordingly
+                } catch (Exception e) {
+                    log.error("Error occurred while calculating match rate for job: {}", job.getId(), e);
+                    // Handle the error accordingly
                 }
-            }
-            else {
-                filteredJobs.remove(job);
+                jobListingDTORepository.save(job);
             }
         }
-        log.info("Подобрано {} вакансий с заданным порогом совпадения {} %", filteredJobs.size(), matchPercentage);
-        return filteredJobs;
+        if (counter > 0 && filteredJobs.isEmpty()) {
+            answer = String.format("К сожалению на загруженные вакансии" +
+                    " с заданным порогом совпадения %d ничего не нашлось", matchPercentage);
+        } else if (counter == 0) {
+            answer = "В безе нет необработанных вакансий. Загрузите новые вакансии /download_jobs";
+        } else {
+            log.info("Подобрано {} вакансий с заданным порогом совпадения {} % " +
+                    "Нажмите /show_matched для просмотра результатов", filteredJobs.size(), matchPercentage);
+            answer = String.format("Подобрано %d вакансий с заданным порогом совпадения %d",
+                    filteredJobs.size(), matchPercentage);
+        }
+        return answer;
     }
 
     @Override
@@ -117,7 +126,6 @@ public class JobServiceImpl implements JobService {
         List<String> jobs = new ArrayList<>();
         jobs.add(String.format(EMAIL_PREFIX, appUser.getEmail()));
         List<JobListingDTO> jobList = jobListingDTORepository.findByUserIdMatched(appUser.getId(), JobMatchState.MATCH);
-
         if (jobList.isEmpty()) {
             return "Похоже у вас еще нет совпадений либо вы не загрузили вакансии " +
                     "Для поиска подходящих вакансий нажмите /match " +
@@ -161,7 +169,7 @@ public class JobServiceImpl implements JobService {
         return String.join("", jobs);
     }
 
-    private static void generateJobListStingForTelegram(List<String> jobs, List<JobListingDTO> jobList) {
+    private void generateJobListStingForTelegram(List<String> jobs, List<JobListingDTO> jobList) {
         if (jobList.size() > 0) {
             for (JobListingDTO job : jobList) {
                 String answerForMatch = "No";
@@ -198,6 +206,8 @@ public class JobServiceImpl implements JobService {
     }
 
     private CompletableFuture<List<String>> generateCoverLetters(AppUser appUser, List<JobListingDTO> jobList) {
+        ChatGPTPrompt prompt = promptsRepository.findByPromptType(1L, PromptType.GENERATE_COVER_LETTER);
+        String PROMPT_MESSAGE_FOR_COVER_GENERATION = prompt.getPrompt();
         Optional<CurriculumVitaeDTO> curriculumVitae = curriculumVitaeRepository.findById(appUser.getId());
         List<CompletableFuture<String>> coverLetterFutures = new ArrayList<>();
 
@@ -238,29 +248,14 @@ public class JobServiceImpl implements JobService {
                                                   CurriculumVitaeDTO curriculumVitae) {
         promptToGenerateCoverLetter
                 .append(initializationPrompt).append("Here goes my CV: ")
-                .append(replaceSymbolsWithSpaces(curriculumVitae.getCvDescription()));
-    }
-
-    private void buildPromptForChatGPTForJobListing(StringBuilder jobDescription, JobListing job) {
-        jobDescription
-                .append(" Here is the job description: ").append(" ")
-                .append(replaceSymbolsWithSpaces(job.getCompanyName())).append(" ")
-                .append(replaceSymbolsWithSpaces(job.getJobTitle())).append(" ")
-                .append(replaceSymbolsWithSpaces(job.getCompanyDescription())).append(" ")
-                .append(replaceSymbolsWithSpaces(job.getJobResponsibilities())).append(" ")
-                .append(replaceSymbolsWithSpaces(job.getJobQualifications())).append(" ")
-                .append(replaceSymbolsWithSpaces(job.getJobAdditionalSkills()));
+                .append(curriculumVitae.getCvDescription());
     }
 
     private void buildPromptForChatGPTForJobListingDTO(StringBuilder jobDescription, JobListingDTO job) {
         jobDescription
                 .append("Here is the job description: ").append(" ")
-                .append(replaceSymbolsWithSpaces(job.getCompanyName())).append(" ")
-                .append(replaceSymbolsWithSpaces(job.getJobTitle())).append(" ")
-                .append(replaceSymbolsWithSpaces(job.getJobDescription()));
-    }
-
-    public String replaceSymbolsWithSpaces(String text) {
-        return text.replaceAll("[^a-zA-Z0-9 ]", "");
+                .append(job.getCompanyName()).append(" ")
+                .append(job.getJobTitle()).append(" ")
+                .append(job.getJobDescription());
     }
 }

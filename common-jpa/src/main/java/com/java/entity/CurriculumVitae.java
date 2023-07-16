@@ -4,10 +4,9 @@ import lombok.*;
 
 import javax.persistence.*;
 import javax.validation.constraints.NotBlank;
-import java.util.List;
 
 @Entity
-@Table(name = "cv")
+@Table(name = "curriculum_vitae")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -19,53 +18,55 @@ public class CurriculumVitae {
     @Column(name = "id")
     private Long id;
 
-    @Column(name = "full_name", nullable = false)
+    @Column(name = "full_name")
     @NotBlank(message = "Full name is required")
-    private String fullName;
+    private String name;
 
-    @Column(name = "contact_information", nullable = false)
+    @Column(name = "position")
+    @NotBlank(message = "Full name is required")
+    private String position;
+
+    @Column(name = "email")
     @NotBlank(message = "Contact information is required")
-    private String contactInformation;
+    private String email;
 
-    @Column(name = "summary_objective", nullable = false)
-    @NotBlank(message = "Summary/Objective is required")
-    private String summaryObjective;
+    @Column(name = "phone")
+    private String phone;
 
-    @Column(name = "soft_skills", nullable = false)
-    @NotBlank(message = "Soft skills are required")
-    private String softSkills;
-
-    @Column(name = "education_history", nullable = false)
-    @NotBlank(message = "Education history is required")
-    private String educationHistory;
-
-    @Column(name = "hard_skills", nullable = false)
+    @Column(name = "hard_skills", columnDefinition = "TEXT")
     @NotBlank(message = "Hard skills are required")
     private String hardSkills;
 
-    @Column(name = "certifications")
-    private String certifications;
+    @Column(name = "soft_skills", columnDefinition = "TEXT")
+    @NotBlank(message = "Hard skills are required")
+    private String softSkills;
 
-    @Column(name = "projects")
-    private String projects;
+    @Column(name = "years_of_experience")
+    private String yearsOfExperience;
+    @Column(name = "experience_description", columnDefinition = "TEXT")
+    private String experienceDescription;
 
-    @Column(name = "awards_achievements")
-    private String awardsAchievements;
-
-    @Column(name = "references_info")
-    private String referencesInfo;
-
-    @Column(name = "linkedin_url")
-    private String linkedinUrl;
-
-    @Column(name = "github_url")
-    private String githubUrl;
-
-    @OneToMany
-    private List<JobExperience> jobExperience;
+    @Column(name = "education")
+    @NotBlank(message = "Education history is required")
+    private String education;
 
     @ManyToOne
     @JoinColumn(name = "app_user_id")
     private AppUser appUser;
+
+    public CurriculumVitae(String name, String position, String email, String phone, String hardSkills, String softSkills,
+                           String yearsOfExperience, String experienceDescription, String education, AppUser appUser) {
+        this.name = name;
+        this.email = email;
+        this.phone = phone;
+        this.position = position;
+        this.hardSkills = hardSkills;
+        this.softSkills = softSkills;
+        this.yearsOfExperience = yearsOfExperience;
+        this.experienceDescription = experienceDescription;
+        this.education = education;
+        this.appUser = appUser;
+    }
+
 }
 

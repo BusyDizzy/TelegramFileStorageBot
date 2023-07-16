@@ -16,11 +16,12 @@ public enum ServiceCommand {
 
     SHOW_MATCHED("/show_matched"),
 
-    GENERATE_AND_SEND("/generate_cover"),
+    GENERATE_AND_SEND("/generate"),
 
-    SUGGEST_IMPROVE("/suggest_improvements"),
+    SUGGEST_IMPROVE("/improve"),
 
-    UPDATE("/update_resume"),
+    UPDATE("/update"),
+    HIDDEN("/hidden"),
     HELP("/help"),
     CANCEL("/cancel"),
 

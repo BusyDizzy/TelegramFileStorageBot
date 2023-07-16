@@ -1,6 +1,7 @@
 package com.java.service;
 
 import com.java.entity.AppUser;
+import com.java.entity.Pair;
 import org.springframework.http.ResponseEntity;
 
 import java.util.List;
@@ -12,5 +13,7 @@ public interface AppUserService {
 
     ResponseEntity<String> sendUserData(AppUser appUser, String message);
 
-    ResponseEntity<String> sendMultipleCoverLetters(AppUser appUser, List<String> coverLetterFiles);
+    ResponseEntity<String> sendMultipleCoverLetters(AppUser appUser,
+                                                    List<Pair<String, String>> coverLetterContentsAndFilenames,
+                                                    String jobsInfo);
 }

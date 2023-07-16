@@ -56,9 +56,10 @@ public class OpenAIServiceImpl implements OpenAIService {
     public CompletableFuture<String> chatGPTRequestMemoryLess(String message) {
         return CompletableFuture.supplyAsync(() -> {
             // Create the stateless request body as a JSON string
+            String sanitizedMessage = sanitizeMessage(message);
             String requestBody =
                     String.format("{\"model\":\"%s\",\"messages\":[{\"role\":\"user\",\"content\":\"%s\"}]}",
-                            model, message);
+                            model, sanitizedMessage);
             return retryTemplate.execute(context -> sendMessageToChatGPT(requestBody));
         });
     }
@@ -91,32 +92,6 @@ public class OpenAIServiceImpl implements OpenAIService {
         log.info("Message for ChatGPT was build");
         return sendMessageToChatGPT(requestBody);
     }
-
-//    public Double calculateMatchRateForCvAndJob(String message) {
-//        int attempts = 3;
-//        double totalJobRate = 0;
-//        int successfulAttempts = 0;
-//
-//        for (int i = 0; i < attempts; i++) {
-//            try {
-//                // Create the stateless request body as a JSON string
-//                String sanitizedMessage = sanitizeMessage(message);
-//                String requestBody =
-//                        String.format("{\"model\":\"%s\",\"messages\":[{\"role\":\"user\",\"content\":\"%s\"}]}",
-//                                model, sanitizedMessage);
-//                log.info("Message for ChatGPT was build");
-//                double currentJobRate = Double.parseDouble(sendMessageToChatGPT(requestBody));
-//                totalJobRate += currentJobRate;
-//                successfulAttempts++;
-//                Thread.sleep(DELAY_BETWEEN_REQUESTS);
-//            } catch (Exception e) {
-//                log.error("ChatGPT returned not a value for some reason", e);
-//                // In case of exception we retry
-//            }
-//        }
-//
-//        return successfulAttempts > 0 ? totalJobRate / successfulAttempts : null;
-//    }
 
     private String sendMessageToChatGPT(String requestBody) throws ChatGPTException {
         // Create headers with Content-Type and Authorization
@@ -184,21 +159,6 @@ public class OpenAIServiceImpl implements OpenAIService {
             return null;
         }
     }
-
-    //    private String sanitizeMessage(String message) {
-//        return message
-//                .replace("\\", "\\\\")
-//                .replace("\"", "\\\"")
-//                .replace("\n", "\\n")
-//                .replace("\r", "\\r")
-//                .replace("\t", "\\t")
-//                .replace("'", "\\'");
-//    }
-//    public static String sanitizeMessage(String text) {
-//        String pattern = "[^a-zA-Z0-9\\s,.+\\-?!@]";
-//        String cleanText = text.replaceAll(pattern, " ");
-//        return cleanText;
-//    }
 
     public String sanitizeMessage(String text) {
         return text.replaceAll("[^a-zA-Z0-9 ]", " ");

@@ -32,18 +32,13 @@ public class MailController {
         return ResponseEntity.ok().build();
     }
 
-//    @PostMapping("/send-data")
-//    public ResponseEntity<?> sendMailWithMultipleCovers(@RequestBody MailParams mailParams) {
-//        mailSenderService.sendEmailWithMultipleCovers(mailParams);
-//        // TODO Check the returned values or set return void
-//        return ResponseEntity.ok().build();
-//    }
-
     @PostMapping("/send-data")
     public ResponseEntity<?> sendMailWithMultipleCovers(@RequestParam("emailTo") String emailTo,
-                                                        @RequestParam("coverLetterFiles") List<MultipartFile> coverLetterFiles) {
+                                                        @RequestParam("coverLetterFiles") List<MultipartFile> coverLetterFiles,
+                                                        @RequestParam("emailBody") String emailBody) {
         MailParams mailParams = MailParams.builder()
                 .emailTo(emailTo)
+                .emailBody(emailBody)
                 .coverLetterFiles(coverLetterFiles)
                 .build();
         mailSenderService.sendEmailWithMultipleCovers(mailParams);

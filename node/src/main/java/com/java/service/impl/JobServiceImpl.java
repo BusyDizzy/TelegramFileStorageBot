@@ -5,6 +5,7 @@ import com.java.DTO.JobListingDTO;
 import com.java.client.JobClient;
 import com.java.entity.AppUser;
 import com.java.entity.ChatGPTPrompt;
+import com.java.entity.Pair;
 import com.java.entity.enums.JobMatchState;
 import com.java.entity.enums.PromptType;
 import com.java.repository.ChatGPTPromptsRepository;
@@ -20,30 +21,20 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 public class JobServiceImpl implements JobService {
-
-
-    //    private final AsyncTaskExecutor taskExecutor;
     private final OpenAIService openAIService;
     private final JobListingRepository jobListingRepository;
-
     private final JobListingDTORepository jobListingDTORepository;
-
     private final CurriculumVitaeDTORepository curriculumVitaeRepository;
-
     private static final String EMAIL_PREFIX = "На вашу почту %s были отправлены письма на следующие вакансии: \n";
-
     private final AppUserService appUserService;
-
     private final ChatGPTPromptsRepository promptsRepository;
-
     private List<JobListingDTO> currentDownloadedJobsList;
-
     private final JobClient jobClient;
 
     public JobServiceImpl(OpenAIServiceImpl openAIServiceImpl,
@@ -75,7 +66,6 @@ public class JobServiceImpl implements JobService {
         double userMatchValue = matchPercentage / 100.0;
         List<JobListingDTO> filteredJobs = new ArrayList<>();
         log.info("Начинаем анализ {} вакансий с заданным порогом совпадения {} %", jobListingDTOS.size(), matchPercentage);
-        // TODO Заменить на новый репозиторий как будет
         Optional<CurriculumVitaeDTO> curriculumVitae = curriculumVitaeRepository.findByUserId(appUser.getId());
         for (JobListingDTO job : jobListingDTOS) {
             StringBuilder promptToCalculateJobMatchingRate = new StringBuilder();
@@ -125,37 +115,85 @@ public class JobServiceImpl implements JobService {
     public String generateCoversAndSendAsAttachment(AppUser appUser) {
         List<String> jobs = new ArrayList<>();
         jobs.add(String.format(EMAIL_PREFIX, appUser.getEmail()));
-        List<JobListingDTO> jobList = jobListingDTORepository.findByUserIdMatched(appUser.getId(), JobMatchState.MATCH);
+        List<JobListingDTO> jobList = jobListingDTORepository.findByUserIdMatchedAndCoverNotSend(appUser.getId(),
+                JobMatchState.MATCH, false);
+        AtomicInteger id = new AtomicInteger(1);
         if (jobList.isEmpty()) {
             return "Похоже у вас еще нет совпадений либо вы не загрузили вакансии " +
                     "Для поиска подходящих вакансий нажмите /match " +
                     "Для загрузки /download_jobs";
         }
-
         for (JobListingDTO job : jobList) {
-            String messageString = String.format("Company: %s, Job Title: %s,  \n",
+            String messageString = String.format("Company: %s, Job Title: %s,  \n\n",
                     job.getCompanyName(), job.getJobTitle());
             jobs.add(messageString);
         }
         log.info("Job list prepared, generating cover letters");
         // Generate Multiple Cover Letters
-        CompletableFuture<List<String>> listCompletableFuture = generateCoverLetters(appUser, jobList);
+        CompletableFuture<List<Pair<String, String>>> listCompletableFuture = generateCoverLetters(appUser, jobList);
+
+        String jobsInfo = jobList.stream()
+                .map(job -> String.format("Job number %d\n Location: %s\n Job Title: %s\n" +
+                                " Company: %s\n Source: %s\n URL: %s\n Cover Letter Filename: %s.txt\n\n",
+                        id.getAndIncrement(), job.getLocation(), job.getJobTitle(), job.getCompanyName(),
+                        job.getSourceWebsite(), job.getUrl(), generateCoverLetterFilename(job)))
+                .collect(Collectors.joining());
 
         // If generated try to send them all in one email as attachments
         try {
             assert listCompletableFuture != null;
-            appUserService.sendMultipleCoverLetters(appUser, listCompletableFuture.get());
-        } catch (InterruptedException | ExecutionException e) {
+            appUserService.sendMultipleCoverLetters(appUser, listCompletableFuture.get(), jobsInfo);
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
+
         return String.join("", jobs);
+    }
+
+    private CompletableFuture<List<Pair<String, String>>> generateCoverLetters(AppUser appUser, List<JobListingDTO> jobList) {
+        ChatGPTPrompt prompt = promptsRepository.findByPromptType(1L, PromptType.GENERATE_COVER_LETTER);
+        String PROMPT_MESSAGE_FOR_COVER_GENERATION = prompt.getPrompt();
+        Optional<CurriculumVitaeDTO> curriculumVitae = curriculumVitaeRepository.findByUserId(appUser.getId());
+        List<CompletableFuture<Pair<String, String>>> coverLetterFutures = new ArrayList<>();
+
+        for (JobListingDTO job : jobList) {
+            StringBuilder promptToGenerateCoverLetter = new StringBuilder();
+            if (curriculumVitae.isPresent()) {
+                buildPromptForChatGPTForUserData(promptToGenerateCoverLetter,
+                        PROMPT_MESSAGE_FOR_COVER_GENERATION,
+                        curriculumVitae.get());
+            } else {
+                return CompletableFuture.completedFuture(Collections.emptyList());
+            }
+            buildPromptForChatGPTForJobListingDTO(promptToGenerateCoverLetter, job);
+
+            String filename = generateCoverLetterFilename(job);
+
+            if (!job.getIsCoverSend()) {
+                CompletableFuture<Pair<String, String>> coverLetterFuture = openAIService
+                        .chatGPTRequestMemoryLess(promptToGenerateCoverLetter.toString())
+                        .thenApply(content -> new Pair<>(content, filename));
+
+                job.setIsCoverSend(true);
+                jobListingDTORepository.save(job);
+
+                coverLetterFutures.add(coverLetterFuture);
+            }
+        }
+        log.info("Joining all generated cover letters");
+        // Join all the futures into a single CompletableFuture that completes when all cover letters are generated
+        CompletableFuture<Void> allFutures = CompletableFuture.allOf(coverLetterFutures.toArray(new CompletableFuture[0]));
+
+        return allFutures.thenApply(v -> coverLetterFutures.stream()
+                .map(CompletableFuture::join)   // join each future (blocking operation, but they should all be completed already because of the `allOf`)
+                .collect(Collectors.toList()));
     }
 
     public String showDownloadedJobs(AppUser appUser) {
         List<String> jobs = new ArrayList<>();
         List<JobListingDTO> jobList = jobListingDTORepository.findByUserId(appUser.getId());
         if (jobList.size() > 0) {
-            generateJobListStingForTelegram(jobs, jobList);
+            prepareJobListStingForTelegram(jobs, jobList);
         } else {
             return "В вашей базе пока нет скаченных вакансий";
         }
@@ -165,11 +203,11 @@ public class JobServiceImpl implements JobService {
     public String showMatchedJobs(AppUser appUser) {
         List<String> jobs = new ArrayList<>();
         List<JobListingDTO> jobList = jobListingDTORepository.findByUserIdMatched(appUser.getId(), JobMatchState.MATCH);
-        generateJobListStingForTelegram(jobs, jobList);
+        prepareJobListStingForTelegram(jobs, jobList);
         return String.join("", jobs);
     }
 
-    private void generateJobListStingForTelegram(List<String> jobs, List<JobListingDTO> jobList) {
+    private void prepareJobListStingForTelegram(List<String> jobs, List<JobListingDTO> jobList) {
         if (jobList.size() > 0) {
             for (JobListingDTO job : jobList) {
                 String answerForMatch = "No";
@@ -205,44 +243,10 @@ public class JobServiceImpl implements JobService {
         }
     }
 
-    private CompletableFuture<List<String>> generateCoverLetters(AppUser appUser, List<JobListingDTO> jobList) {
-        ChatGPTPrompt prompt = promptsRepository.findByPromptType(1L, PromptType.GENERATE_COVER_LETTER);
-        String PROMPT_MESSAGE_FOR_COVER_GENERATION = prompt.getPrompt();
-        Optional<CurriculumVitaeDTO> curriculumVitae = curriculumVitaeRepository.findById(appUser.getId());
-        List<CompletableFuture<String>> coverLetterFutures = new ArrayList<>();
+    private String generateCoverLetterFilename(JobListingDTO job) {
+        return String.format("%s_%s_%s", job.getJobTitle(), job.getCompanyName(), job.getLocation());
 
-        for (JobListingDTO job : jobList) {
-            StringBuilder promptToGenerateCoverLetter = new StringBuilder();
-            if (curriculumVitae.isPresent()) {
-                buildPromptForChatGPTForUserData(promptToGenerateCoverLetter,
-                        PROMPT_MESSAGE_FOR_COVER_GENERATION,
-                        curriculumVitae.get());
-            } else {
-                return null;
-            }
-            buildPromptForChatGPTForJobListingDTO(promptToGenerateCoverLetter, job);
-            if (!job.getIsCoverSend()) {
-                CompletableFuture<String> coverLetterFuture = openAIService.
-                        chatGPTRequestMemoryLess(promptToGenerateCoverLetter.toString());
-
-                job.setIsCoverSend(true);
-                jobListingDTORepository.save(job);
-
-                coverLetterFutures.add(coverLetterFuture);
-            }
-        }
-
-        // Join all the futures into a single CompletableFuture that completes when all cover letters are generated
-        log.info("Joining all generated cover letters");
-        // Join all the futures into a single CompletableFuture that completes when all cover letters are generated
-        CompletableFuture<Void> allFutures = CompletableFuture.allOf(coverLetterFutures.toArray(new CompletableFuture[0]));
-
-        // Convert CompletableFuture<Void> to CompletableFuture<List<String>>
-        return allFutures.thenApply(v -> coverLetterFutures.stream()
-                .map(CompletableFuture::join) // join each future (blocking operation, but they should all be completed already because of the `allOf`)
-                .collect(Collectors.toList()));
     }
-
 
     private void buildPromptForChatGPTForUserData(StringBuilder promptToGenerateCoverLetter, String initializationPrompt,
                                                   CurriculumVitaeDTO curriculumVitae) {

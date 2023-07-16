@@ -14,4 +14,7 @@ public interface JobListingDTORepository extends JpaRepository<JobListingDTO, Lo
 
     @Query("Select j from JobListingDTO j where j.appUser.id=:userId and j.jobMatchState=:matched")
     List<JobListingDTO> findByUserIdMatched(@Param("userId") Long userId, JobMatchState matched);
+
+    @Query("Select j from JobListingDTO j where j.appUser.id=:userId and j.jobMatchState=:matched and j.isCoverSend=:isCoverSend")
+    List<JobListingDTO> findByUserIdMatchedAndCoverNotSend(@Param("userId") Long userId, JobMatchState matched, Boolean isCoverSend);
 }

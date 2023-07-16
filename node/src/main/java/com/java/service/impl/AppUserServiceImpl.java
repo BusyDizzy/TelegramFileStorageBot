@@ -2,6 +2,7 @@ package com.java.service.impl;
 
 import com.java.dto.MailParams;
 import com.java.entity.AppUser;
+import com.java.entity.Pair;
 import com.java.repository.AppUserRepository;
 import com.java.service.AppUserService;
 import com.java.utils.CryptoTool;
@@ -124,28 +125,59 @@ public class AppUserServiceImpl implements AppUserService {
         );
     }
 
-    public ResponseEntity<String> sendMultipleCoverLetters(AppUser appUser, List<String> coverLetterContents) {
+    //    public ResponseEntity<String> sendMultipleCoverLetters(AppUser appUser, List<String> coverLetterContents) {
+//        var headers = new HttpHeaders();
+//        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+//
+//        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+//        for (int i = 0; i < coverLetterContents.size(); i++) {
+//            String letterContent = coverLetterContents.get(i);
+//            if (letterContent != null && !letterContent.isEmpty()) {
+//                int finalI = i;
+//                ByteArrayResource resource = new ByteArrayResource(letterContent.getBytes()) {
+//                    @Override
+//                    public String getFilename() {
+//                        return "cover_letter_" + finalI + ".txt";
+//                    }
+//                };
+//                body.add("coverLetterFiles", new HttpEntity<>(resource, getHeaderForResource(resource)));
+//            } else {
+//                log.warn("Cover letter " + i + " is null or empty");
+//            }
+//        }
+//
+//        body.add("emailTo", appUser.getEmail());
+//
+//        var request = new HttpEntity<>(body, headers);
+//        log.info("Sending multiple cover letters via email to: {}", appUser.getEmail());
+//
+//        return restTemplate.exchange(mailServiceDataUri, HttpMethod.POST, request, String.class);
+//    }
+    public ResponseEntity<String> sendMultipleCoverLetters(AppUser appUser,
+                                                           List<Pair<String, String>> coverLetterContentsAndFilenames,
+                                                           String jobsInfo) {
         var headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
 
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-        for (int i = 0; i < coverLetterContents.size(); i++) {
-            String letterContent = coverLetterContents.get(i);
+        for (Pair<String, String> coverLetterContentAndFilename : coverLetterContentsAndFilenames) {
+            String letterContent = coverLetterContentAndFilename.getLeft();
+            String filename = coverLetterContentAndFilename.getRight();
             if (letterContent != null && !letterContent.isEmpty()) {
-                int finalI = i;
                 ByteArrayResource resource = new ByteArrayResource(letterContent.getBytes()) {
                     @Override
                     public String getFilename() {
-                        return "cover_letter_" + finalI + ".txt";
+                        return filename + ".txt";
                     }
                 };
                 body.add("coverLetterFiles", new HttpEntity<>(resource, getHeaderForResource(resource)));
             } else {
-                log.warn("Cover letter " + i + " is null or empty");
+                log.warn("Cover letter for " + filename + " is null or empty");
             }
         }
 
         body.add("emailTo", appUser.getEmail());
+        body.add("emailBody", jobsInfo);
 
         var request = new HttpEntity<>(body, headers);
         log.info("Sending multiple cover letters via email to: {}", appUser.getEmail());

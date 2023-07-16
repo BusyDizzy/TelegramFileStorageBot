@@ -255,12 +255,11 @@ public class MainServiceImpl implements MainService {
             case SHOW_MATCHED -> appUser.getIsActive() ? jobService.showMatchedJobs(appUser) : defaultResponse();
             case GENERATE_AND_SEND -> {
                 if (appUser.getIsCvUploaded() && appUser.getIsActive()) {
-                    jobService.generateCoversAndSendAsAttachment(appUser);
+                    yield jobService.generateCoversAndSendAsAttachment(appUser);
                 } else {
                     yield "Для начала работы с функционалом генерации сопроводительных писем" +
                             " загрузите резюме /upload_resume";
                 }
-                yield "Какая-то оказия случилась...";
             }
             case HIDDEN -> appUser.getRoles().contains(Role.ADMIN) ? "Hi from Admin" : defaultResponse();
             case UPDATE, SUGGEST_IMPROVE -> underConstruction();

@@ -4,7 +4,6 @@ import com.java.dto.MailParams;
 import com.java.service.MailSenderService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.InputStreamSource;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -13,8 +12,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.mail.MessagingException;
 import javax.mail.internet.MimeMessage;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.Objects;
 
 @Service
@@ -70,7 +67,7 @@ public class MailSenderServiceImpl implements MailSenderService {
     @Override
     public void sendEmailWithMultipleCovers(MailParams mailParams) {
         var subject = "Сопроводительные письма на вакансии";
-        var messageBody = "Во вложениях вы найдете файлы на запрошенные вакансии";
+        var messageBody = mailParams.getEmailBody();
         var emailTo = mailParams.getEmailTo();
 
         MimeMessage mimeMessage = javaMailSender.createMimeMessage();
@@ -85,7 +82,7 @@ public class MailSenderServiceImpl implements MailSenderService {
 
             // Adding the attachments
             for (MultipartFile file : mailParams.getCoverLetterFiles()) {
-                helper.addAttachment(Objects.requireNonNull(file.getOriginalFilename()), () -> file.getInputStream());
+                helper.addAttachment(Objects.requireNonNull(file.getOriginalFilename()), file);
             }
 
             javaMailSender.send(mimeMessage);

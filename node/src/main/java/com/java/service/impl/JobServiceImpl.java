@@ -133,7 +133,7 @@ public class JobServiceImpl implements JobService {
         CompletableFuture<List<Pair<String, String>>> listCompletableFuture = generateCoverLetters(appUser, jobList);
 
         String jobsInfo = jobList.stream()
-                .map(job -> String.format("Job number %d\n Location: %s\n Job Title: %s\n" +
+                .map(job -> String.format("Job number: %d\n Location: %s\n Job Title: %s\n" +
                                 " Company: %s\n Source: %s\n URL: %s\n Cover Letter Filename: %s.txt\n\n",
                         id.getAndIncrement(), job.getLocation(), job.getJobTitle(), job.getCompanyName(),
                         job.getSourceWebsite(), job.getUrl(), generateCoverLetterFilename(job)))

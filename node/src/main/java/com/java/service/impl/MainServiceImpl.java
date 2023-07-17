@@ -12,7 +12,7 @@ import com.java.repository.AppUserRepository;
 import com.java.repository.RawDataRepository;
 import com.java.service.*;
 import com.java.service.enums.ServiceCommand;
-import com.java.service.fetching.LinkedInLocationService;
+import com.java.service.LinkedInLocationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;

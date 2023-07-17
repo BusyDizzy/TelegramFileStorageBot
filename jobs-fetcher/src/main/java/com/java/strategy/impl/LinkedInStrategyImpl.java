@@ -2,7 +2,7 @@ package com.java.strategy.impl;
 
 import com.java.DTO.JobListingDTO;
 import com.java.entity.enums.JobMatchState;
-import com.java.service.fetching.LinkedInLocationService;
+import com.java.service.LinkedInLocationService;
 import com.java.strategy.Strategy;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.HttpStatusException;

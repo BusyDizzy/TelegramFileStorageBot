@@ -2,13 +2,14 @@ package com.java.service.fetching;
 
 import com.java.entity.LinkedInLocation;
 import com.java.repository.LinkedInLocationRepository;
+import com.java.service.LinkedInLocationService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
 
 @Service
-public class LinkedInLocationServiceImpl implements LinkedInLocationService{
+public class LinkedInLocationServiceImpl implements LinkedInLocationService {
     private final LinkedInLocationRepository linkedInLocationRepository;
 
     public LinkedInLocationServiceImpl(LinkedInLocationRepository linkedInLocationRepository) {

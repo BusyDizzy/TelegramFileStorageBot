@@ -3,7 +3,8 @@ package com.java.service.impl;
 import com.java.DTO.JobListingDTO;
 import com.java.repository.JobListingDTORepository;
 import com.java.service.JobFetcher;
-import com.java.service.UrlShortener;
+
+import com.java.service.UrlShortenerService;
 import com.java.strategy.Strategy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,12 +21,12 @@ public class JobFetcherImpl implements JobFetcher {
     private final JobListingDTORepository jobRepository;
     private final Map<String, Strategy> strategies;
 
-    private final UrlShortener urlShortener;
+    private final UrlShortenerService urlShortener;
 
-    public JobFetcherImpl(JobListingDTORepository jobRepository, Map<String, Strategy> strategies, UrlShortener urlShortener) {
+    public JobFetcherImpl(JobListingDTORepository jobRepository, Map<String, Strategy> strategies, UrlShortenerService urlShortenerService) {
         this.jobRepository = jobRepository;
         this.strategies = strategies;
-        this.urlShortener = urlShortener;
+        this.urlShortener = urlShortenerService;
     }
 
     @Override

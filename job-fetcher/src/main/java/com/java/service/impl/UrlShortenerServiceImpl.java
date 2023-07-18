@@ -2,7 +2,7 @@ package com.java.service.impl;
 
 import com.java.entity.UrlMapping;
 import com.java.repository.UrlMappingRepository;
-import com.java.service.UrlShortener;
+import com.java.service.UrlShortenerService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,12 +10,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Random;
 
 @Service
-public class UrlShortenerImpl implements UrlShortener {
+public class UrlShortenerServiceImpl implements UrlShortenerService {
     private final UrlMappingRepository urlMappingRepository;
     private static final String domain = "http://127.0.0.1:8086/r/"; // Use your domain name
     private static final char[] charSet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".toCharArray();
 
-    public UrlShortenerImpl(UrlMappingRepository urlMappingRepository) {
+    public UrlShortenerServiceImpl(UrlMappingRepository urlMappingRepository) {
         this.urlMappingRepository = urlMappingRepository;
     }
 

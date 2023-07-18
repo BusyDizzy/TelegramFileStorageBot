@@ -1,5 +1,5 @@
 # Use an appropriate base image with Java and other dependencies
-FROM adoptopenjdk:11-jre-hotspot
+FROM adoptopenjdk:16-jre-hotspot
 
 # Install supervisor
 RUN apt-get update && apt-get install -y supervisor
@@ -12,14 +12,16 @@ COPY dispatcher/target/dispatcher-1.0-SNAPSHOT.jar dispatcher.jar
 COPY node/target/node-1.0-SNAPSHOT.jar node.jar
 COPY rest-service/target/rest-service-1.0-SNAPSHOT.jar rest-service.jar
 COPY mail-service/target/mail-service-1.0-SNAPSHOT.jar mail-service.jar
+COPY jobs-fetcher/target/jobs-fetcher-1.0-SNAPSHOT.jar jobs-fetcher.jar
 
 # Copy the modules JAR files into the container
 COPY common-jpa/target/common-jpa-1.0-SNAPSHOT.jar common-jpa.jar
 COPY common-rabbitmq/target/common-rabbitmq-1.0-SNAPSHOT.jar common-rabbitmq.jar
 COPY common-utils/target/common-utils-1.0-SNAPSHOT.jar common-utils.jar
+COPY chatgpt/target/chatgpt-1.0-SNAPSHOT.jar chatgpt.jar
 
 # Expose the ports on which the microservices run
-EXPOSE 8084 8085 8086 8087
+EXPOSE 8084 8085 8086 8087 8083
 
 # Configure supervisord
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf

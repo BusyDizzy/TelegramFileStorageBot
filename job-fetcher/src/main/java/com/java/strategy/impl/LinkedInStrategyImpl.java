@@ -13,6 +13,7 @@ import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
@@ -57,6 +58,9 @@ public class LinkedInStrategyImpl implements Strategy {
 
     @Override
     public Set<JobListingDTO> getVacancies(String query, String location, Long appUserId) {
+        if (linkedInLocationService.getGeoIdByLocationName(location).isEmpty()) {
+            return Collections.emptySet();
+        }
         String geoId = linkedInLocationService.getGeoIdByLocationName(location).get();
         Set<JobListingDTO> jobListings = new HashSet<>();
         final int MAX_RETRY = 3; // Maximum number of retries

@@ -1,6 +1,6 @@
 package com.java.controller;
 
-import com.java.service.UrlShortener;
+import com.java.service.UrlShortenerService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,15 +13,15 @@ import java.io.IOException;
 @RequestMapping("/r")
 public class RedirectController {
 
-    private final UrlShortener urlShortener;
+    private final UrlShortenerService urlShortenerService;
 
-    public RedirectController(UrlShortener urlShortener) {
-        this.urlShortener = urlShortener;
+    public RedirectController(UrlShortenerService urlShortenerService) {
+        this.urlShortenerService = urlShortenerService;
     }
 
     @GetMapping("/{key}")
     public void redirect(@PathVariable("key") String key, HttpServletResponse response) throws IOException {
-        String originalUrl = urlShortener.getOriginalURL(key);
+        String originalUrl = urlShortenerService.getOriginalURL(key);
         if (originalUrl != null) {
             response.sendRedirect(originalUrl);
         } else {
@@ -30,4 +30,3 @@ public class RedirectController {
         }
     }
 }
-

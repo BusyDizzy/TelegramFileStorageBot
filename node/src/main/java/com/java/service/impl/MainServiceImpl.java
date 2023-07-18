@@ -12,7 +12,6 @@ import com.java.repository.AppUserRepository;
 import com.java.repository.RawDataRepository;
 import com.java.service.*;
 import com.java.service.enums.ServiceCommand;
-import com.java.service.LinkedInLocationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -35,9 +34,9 @@ public class MainServiceImpl implements MainService {
     private final FileService fileService;
     private final AppUserService appUserService;
 
-    private final JobService jobService;
-
     private final LinkedInLocationService linkedInLocationService;
+
+    private final JobService jobService;
 
     private static String SEARCH_QUERY = null;
 
@@ -55,15 +54,15 @@ public class MainServiceImpl implements MainService {
                            AppUserRepository appUserRepository,
                            FileService fileService,
                            AppUserService appUserService,
-                           JobService jobService,
-                           LinkedInLocationService linkedInLocationService, OpenAIService openAIService) {
+                           LinkedInLocationService linkedInLocationService, JobService jobService,
+                           OpenAIService openAIService) {
         this.rawDataRepository = rawDataRepository;
         this.service = service;
         this.appUserRepository = appUserRepository;
         this.fileService = fileService;
         this.appUserService = appUserService;
-        this.jobService = jobService;
         this.linkedInLocationService = linkedInLocationService;
+        this.jobService = jobService;
         this.openAIService = openAIService;
     }
 
@@ -97,7 +96,7 @@ public class MainServiceImpl implements MainService {
                         // Checking if LinkedIn geoId is supported (stored in db)
                         if (linkedInLocationService.getGeoIdByLocationName(text).isEmpty()) {
                             output = "Поиск по данному региону пока не поддерживается. " +
-                                    "Просьба связаться с разработчиком: anton.tk@gmail.com";
+                                    "Просьба связаться с разработчиком: @AntonTkatch";
                             appUser.setState(BASIC_STATE);
                             appUserRepository.save(appUser);
                             break;

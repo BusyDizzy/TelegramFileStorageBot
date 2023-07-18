@@ -1,4 +1,4 @@
-package com.java.service.fetching;
+package com.java.service.impl;
 
 import com.java.entity.LinkedInLocation;
 import com.java.repository.LinkedInLocationRepository;
